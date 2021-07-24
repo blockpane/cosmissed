@@ -16,7 +16,7 @@ import (
 const lagBlocks = 3
 
 func main() {
-	l := log.New(os.Stderr, "cosmiss | ", log.Lshortfile|log.LstdFlags)
+	l := log.New(os.Stderr, "cosmissed | ", log.Lshortfile|log.LstdFlags)
 
 	var (
 		current, successful, track, listen int
@@ -29,7 +29,7 @@ func main() {
 	flag.StringVar(&prefix, "p", "cosmos", "address prefix, ex- cosmos = cosmosvaloper, cosmosvalcons ...")
 	flag.IntVar(&listen, "l", 8080, "webserver port to listen on")
 	flag.IntVar(&track, "n", 3000, "most recent blocks to track")
-	flag.BoolVar(&stdout, "v", false, "log new records to stdout (error logs on stderr")
+	flag.BoolVar(&stdout, "v", false, "log new records to stdout (error logs already on stderr)")
 
 	flag.Parse()
 
