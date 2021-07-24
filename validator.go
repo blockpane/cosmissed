@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const prefix = "osmo"
+var Prefix = "cosmos"
 
 type ConsensusPubkey struct {
 	Type string `json:"@type"`
@@ -132,7 +132,7 @@ func ParseValidatorsResp(body []byte) ([]Validator, error) {
 							validator.ConsensusPubkey.Type = toStr(u)
 						case "key":
 							validator.ConsensusPubkey.Key = toStr(u)
-							validator.Valcons, _ = PubToCons(prefix+"valcons", validator.ConsensusPubkey.Key)
+							validator.Valcons, _ = PubToCons(Prefix+"valcons", validator.ConsensusPubkey.Key)
 							validator.ValidatorAddress, _ = pubToHex(validator.ConsensusPubkey.Key)
 						}
 					}
