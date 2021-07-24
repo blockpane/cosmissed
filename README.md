@@ -11,8 +11,8 @@ A record looks like this:
 
 ```json
 {
-  "block_num": 475263,
-  "timestamp": 1627090861,
+  "block_num": 123456,
+  "timestamp": 1627000000,
   "missed": 2,
   "missing": {
     "some missing validator": "cosmosvalconsxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
@@ -26,6 +26,8 @@ A record looks like this:
   can occur if the server is slow or behind (this affects the tendermint prometheus exporter too.
 * This requires access to both the tendermint and cosmos rpc APIs (normally port 26657 and 1317.) 
 * It may be traffic intensive (especially when building the cache,) and should be run against a local, private server.
+* The error `not a valid HistValidatorsResp structure` at startup likely means that the state has been pruned for that block height
+  on your API server and there is not enough history to build the full cache. Try a lower `-n` value.
 
 Usage:
 

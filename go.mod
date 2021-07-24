@@ -1,4 +1,4 @@
-module github.com/frameloss/playground/cosmos-missed
+module github.com/frameloss/playground/cosmissed
 
 go 1.16
 
