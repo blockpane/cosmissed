@@ -1,4 +1,4 @@
-module github.com/frameloss/playground/cosmissed
+module github.com/blockpane/cosmissed
 
 go 1.16
 

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	missed "github.com/frameloss/playground/cosmos-missed"
+	missed "github.com/blockpane/cosmissed"
 	"github.com/gorilla/websocket"
 	"github.com/textileio/go-threads/broadcast"
 	"log"
@@ -21,7 +21,7 @@ func main() {
 	var (
 		current, successful, track, listen int
 		cosmosApi, tendermintApi, prefix   string
-		ready, stdout bool
+		ready, stdout                      bool
 	)
 
 	flag.StringVar(&cosmosApi, "c", "http://127.0.0.1:1317", "cosmos http API endpoint")
@@ -74,10 +74,9 @@ func main() {
 				_ = l.Output(2, e.Error())
 				return
 			}
-			if summary.BlockNum % logmod == 0 {
+			if summary.BlockNum%logmod == 0 {
 				l.Println("block", summary.BlockNum)
 			}
-
 
 			successful = i
 			push(summary)
@@ -107,7 +106,6 @@ func main() {
 			}
 		}
 	}()
-
 
 	http.HandleFunc("/missed", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Access-Control-Allow-Origin", "*")

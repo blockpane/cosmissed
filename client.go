@@ -18,10 +18,10 @@ const (
 )
 
 type statusResp struct {
-	Result struct{
-		SyncInfo struct{
+	Result struct {
+		SyncInfo struct {
 			LatestBlockHeight string `json:"latest_block_height"`
-			CatchingUp bool `json:"catching_up"`
+			CatchingUp        bool   `json:"catching_up"`
 		} `json:"sync_info"`
 	} `json:"result"`
 }
