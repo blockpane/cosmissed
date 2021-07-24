@@ -9,7 +9,7 @@ import (
 func TestFetchSummary(t *testing.T) {
 	var (
 		tendermintApi = "http://127.0.0.1:26657"
-		cosmosApi = "http://127.0.0.1:1317"
+		cosmosApi     = "http://127.0.0.1:1317"
 	)
 	if os.Getenv("COSMOS_API") != "" {
 		cosmosApi = os.Getenv("COSMOS_API")
