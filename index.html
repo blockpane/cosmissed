@@ -58,14 +58,14 @@
                     {
                         show: true,
                         realtime: true,
-                        start: 0,
+                        start: 25,
                         end: 100,
                         xAxisIndex: [0, 1]
                     },
                     {
                         type: 'inside',
                         realtime: true,
-                        start: 0,
+                        start: 25,
                         end: 100,
                         xAxisIndex: [0, 1]
                     }
@@ -133,6 +133,19 @@
                                 color: 'rgb(89,71,190)'
                                 //color: 'rgba(1, 191, 236)'
                             }])
+                        },
+                    },
+                    {
+                        name: 'missing consensus %',
+                        type: 'line',
+                        smooth: false,
+                        symbolSize: 0,
+                        hoverAnimation: true,
+                        data: data.missing_percent,
+                        lineStyle: {
+                            color: 'rgb(238,131,25)',
+                            width: 0.8,
+                            type: 'dashed',
                         },
                     },
                     {
