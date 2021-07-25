@@ -33,10 +33,12 @@ func main() {
 
 	flag.Parse()
 
-	results := make([]*missed.Summary, track)
 	cachedResult := []byte("not ready")
 	cachedTop := []byte("not ready")
-	var bcastMissed, bcastTop broadcast.Broadcaster
+	cachedChart := []byte("not ready")
+
+	results := make([]*missed.Summary, track)
+	var bcastMissed, bcastTop, bcastChart broadcast.Broadcaster
 	defer bcastMissed.Discard()
 	defer bcastTop.Discard()
 
@@ -64,14 +66,19 @@ func main() {
 		}
 		results = append(results[1:], sum)
 		if ready {
+			cachedChart, _ = missed.SummariesToChart(results)
 			cachedResult, _ = json.Marshal(results)
 			j, _ := json.Marshal(sum)
 			e := bcastMissed.Send(j)
 			if e != nil {
 				_ = l.Output(2, e.Error())
 			}
+			e = bcastChart.Send([]byte(fmt.Sprintf(`{"blocks":%d,"time":%d,"missed":%d,"took":%f}`, sum.BlockNum, sum.Timestamp, sum.Missed, sum.DeltaSec)))
 			if stdout {
 				fmt.Println(string(j))
+			}
+			if e != nil {
+				_ = l.Output(2, e.Error())
 			}
 			// every 10 blocks recalculate the top missing
 			if sum.BlockNum%10 == 0 {
@@ -142,6 +149,11 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	}
 
+	http.HandleFunc("/chart", func(writer http.ResponseWriter, request *http.Request) {
+		setHeader(writer)
+		_, _ = writer.Write(cachedChart)
+	})
+
 	http.HandleFunc("/missed", func(writer http.ResponseWriter, request *http.Request) {
 		setHeader(writer)
 		_, _ = writer.Write(cachedResult)
@@ -191,6 +203,30 @@ func main() {
 				return
 			}
 		}
+	})
+
+	http.HandleFunc("/chart/ws", func(writer http.ResponseWriter, request *http.Request) {
+		c, err := upgrader.Upgrade(writer, request, nil)
+		if err != nil {
+			l.Print("upgrade:", err)
+			return
+		}
+		defer c.Close()
+		sub := bcastChart.Listen()
+		defer sub.Discard()
+		for b := range sub.Channel() {
+			if e := c.WriteMessage(websocket.TextMessage, b.([]byte)); e != nil {
+				l.Println(request.RemoteAddr, e)
+				return
+			}
+		}
+	})
+
+	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Server", "cosmissed")
+		writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+		// todo appropriate security headers.
+		_, _ = writer.Write(missed.IndexHtml)
 	})
 
 	l.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", listen), nil))
