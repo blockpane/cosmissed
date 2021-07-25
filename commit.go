@@ -30,7 +30,7 @@ func (m minSignatures) parse() (proposer string, utime int64, signers []string) 
 	}
 	t, err := time.Parse(`2006-01-02T15:04:05.999999999Z`, m.Result.SignedHeader.Header.Time)
 	if err == nil {
-		utime = t.UTC().Unix()
+		utime = t.UTC().UnixNano() / 1_000_000 // ms
 	}
 	return m.Result.SignedHeader.Header.ProposerAddress, utime, signers
 }

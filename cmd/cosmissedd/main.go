@@ -35,20 +35,47 @@ func main() {
 
 	results := make([]*missed.Summary, track)
 	cachedResult := []byte("not ready")
-	var bcast broadcast.Broadcaster
-	defer bcast.Discard()
+	cachedTop := []byte("not ready")
+	var bcastMissed, bcastTop broadcast.Broadcaster
+	defer bcastMissed.Discard()
+	defer bcastTop.Discard()
+
+	top := func() {
+		t, err := missed.TopMissed(results, track, prefix, cosmosApi)
+		if err != nil {
+			l.Println(err)
+			return
+		}
+		j, err := json.MarshalIndent(t, "", "  ")
+		if err != nil {
+			l.Println(err)
+			return
+		}
+		cachedTop = j
+		err = bcastTop.Send(j)
+		if err != nil {
+			l.Println(err)
+		}
+	}
 
 	push := func(sum *missed.Summary) {
+		if results[len(results)-1] != nil && results[len(results)-1].Timestamp != 0 {
+			sum.DeltaSec = float64(sum.Timestamp-results[len(results)-1].Timestamp) / 1_000.0
+		}
 		results = append(results[1:], sum)
 		if ready {
 			cachedResult, _ = json.Marshal(results)
 			j, _ := json.Marshal(sum)
-			e := bcast.Send(j)
+			e := bcastMissed.Send(j)
+			if e != nil {
+				_ = l.Output(2, e.Error())
+			}
 			if stdout {
 				fmt.Println(string(j))
 			}
-			if e != nil {
-				_ = l.Output(2, e.Error())
+			// every 10 blocks recalculate the top missing
+			if sum.BlockNum%10 == 0 {
+				top()
 			}
 		}
 	}
@@ -91,6 +118,7 @@ func main() {
 	successful = current - track - lagBlocks - 1
 	l.Printf("fetching last %d blocks, please wait\n", track)
 	refresh()
+	top()
 	ready = true
 	logmod = 10
 	l.Println("cache populated, starting server.")
@@ -107,13 +135,26 @@ func main() {
 		}
 	}()
 
+	setHeader := func(w http.ResponseWriter) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Server", "cosmissed")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+	}
+
 	http.HandleFunc("/missed", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Access-Control-Allow-Origin", "*")
-		writer.Header().Set("Server", "cosmissd")
-		writer.Header().Set("Content-Type", "application/json")
-		writer.Header().Set("X-You-Kids", "get off my lawn")
-		writer.WriteHeader(http.StatusOK)
+		setHeader(writer)
 		_, _ = writer.Write(cachedResult)
+	})
+
+	http.HandleFunc("/top", func(writer http.ResponseWriter, request *http.Request) {
+		setHeader(writer)
+		_, _ = writer.Write(cachedTop)
+	})
+
+	http.HandleFunc("/params", func(writer http.ResponseWriter, request *http.Request) {
+		setHeader(writer)
+		_, _ = writer.Write([]byte(fmt.Sprintf(`{"depth":%d}`, track)))
 	})
 
 	var upgrader = websocket.Upgrader{}
@@ -125,7 +166,24 @@ func main() {
 			return
 		}
 		defer c.Close()
-		sub := bcast.Listen()
+		sub := bcastMissed.Listen()
+		defer sub.Discard()
+		for b := range sub.Channel() {
+			if e := c.WriteMessage(websocket.TextMessage, b.([]byte)); e != nil {
+				l.Println(request.RemoteAddr, e)
+				return
+			}
+		}
+	})
+
+	http.HandleFunc("/top/ws", func(writer http.ResponseWriter, request *http.Request) {
+		c, err := upgrader.Upgrade(writer, request, nil)
+		if err != nil {
+			l.Print("upgrade:", err)
+			return
+		}
+		defer c.Close()
+		sub := bcastTop.Listen()
 		defer sub.Discard()
 		for b := range sub.Channel() {
 			if e := c.WriteMessage(websocket.TextMessage, b.([]byte)); e != nil {
@@ -136,5 +194,4 @@ func main() {
 	})
 
 	l.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", listen), nil))
-
 }
