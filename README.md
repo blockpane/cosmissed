@@ -1,11 +1,17 @@
 # cosmissed
 
-Simple webservice for tracking missed blocks on Tendermint/Cosmos chains.
+Simple webservice/dashboard for tracking missed blocks on Tendermint/Cosmos chains.
+
+![dashboard screenshot](docs/screenshot.png)
 
 Provides two endpoints:
 
 * `/missed` - sends an array of records for last number of tracked `-n` blocks (default 3000)
-* `/missed/ws` - websocket that broadcasts new records.
+* `/chart` - same as previous data, but broken into multiple arrays easier for some charting libraries to consume.
+* `/top` - data for top missing validators, times missed, percent, and vote data
+* `/params` - general data about the chain, very sparse for now.
+
+There are also a few websockets in the works, but documenting them is delayed until the frontend is consuming that information.
 
 A record looks like this:
 

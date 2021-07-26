@@ -36,6 +36,7 @@ func main() {
 	cachedResult := []byte("not ready")
 	cachedTop := []byte("not ready")
 	cachedChart := []byte("not ready")
+	cachedParams := []byte("not ready")
 
 	results := make([]*missed.Summary, track)
 	var bcastMissed, bcastTop, bcastChart broadcast.Broadcaster
@@ -77,6 +78,13 @@ func main() {
 			if stdout {
 				fmt.Println(string(j))
 			}
+			if e != nil {
+				_ = l.Output(2, e.Error())
+			}
+			cachedParams, e = json.Marshal(missed.Params{
+				Depth: track,
+				Power: sum.VotePower,
+			})
 			if e != nil {
 				_ = l.Output(2, e.Error())
 			}
@@ -142,32 +150,12 @@ func main() {
 		}
 	}()
 
-	setHeader := func(w http.ResponseWriter) {
+	setJsonHeader := func(w http.ResponseWriter) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Server", "cosmissed")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 	}
-
-	http.HandleFunc("/chart", func(writer http.ResponseWriter, request *http.Request) {
-		setHeader(writer)
-		_, _ = writer.Write(cachedChart)
-	})
-
-	http.HandleFunc("/missed", func(writer http.ResponseWriter, request *http.Request) {
-		setHeader(writer)
-		_, _ = writer.Write(cachedResult)
-	})
-
-	http.HandleFunc("/top", func(writer http.ResponseWriter, request *http.Request) {
-		setHeader(writer)
-		_, _ = writer.Write(cachedTop)
-	})
-
-	http.HandleFunc("/params", func(writer http.ResponseWriter, request *http.Request) {
-		setHeader(writer)
-		_, _ = writer.Write([]byte(fmt.Sprintf(`{"depth":%d}`, track)))
-	})
 
 	var upgrader = websocket.Upgrader{}
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
@@ -222,11 +210,29 @@ func main() {
 		}
 	})
 
+	http.Handle("/js/", http.FileServer(http.FS(missed.Js)))
+	http.Handle("/img/", http.FileServer(http.FS(missed.Js)))
+
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Server", "cosmissed")
-		writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-		// todo appropriate security headers.
-		_, _ = writer.Write(missed.IndexHtml)
+		switch request.URL.Path {
+		case "/chart":
+			setJsonHeader(writer)
+			_, _ = writer.Write(cachedChart)
+		case "/missed":
+			setJsonHeader(writer)
+			_, _ = writer.Write(cachedResult)
+		case "/top":
+			setJsonHeader(writer)
+			_, _ = writer.Write(cachedTop)
+		case "/params":
+			setJsonHeader(writer)
+			_, _ = writer.Write(cachedParams)
+		case "/", "/index.html":
+			writer.Header().Set("Server", "cosmissed")
+			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+			// todo appropriate security headers.
+			_, _ = writer.Write(missed.IndexHtml)
+		}
 	})
 
 	l.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", listen), nil))

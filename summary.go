@@ -9,6 +9,11 @@ import (
 	"time"
 )
 
+type Params struct {
+	Depth int `json:"depth"`
+	Power uint64 `json:"power"`
+}
+
 type Summary struct {
 	BlockNum    int               `json:"block_num"`
 	Timestamp   int64             `json:"timestamp"`
@@ -52,7 +57,7 @@ type Top struct {
 	Moniker   string  `json:"moniker"`
 	Missed    int     `json:"missed"`
 	MissedPct float32 `json:"missed_pct"`
-	Votes     uint64  `json:"votes"`
+	Votes     int64   `json:"votes"`
 }
 
 type minValidators struct {
@@ -113,7 +118,7 @@ func TopMissed(summaries []*Summary, blocks int, prefix, cosmosApi string) ([]*T
 			MissedPct: 100.0 * float32(v) / float32(blocks),
 		}
 		if tokens, e := strconv.ParseUint(weights.Validators[index[k]].Tokens, 10, 64); e == nil {
-			t.Votes = tokens / 1_000_000
+			t.Votes = int64(tokens) / -1_000_000
 		}
 		t.Moniker = weights.Validators[index[k]].Description.Moniker
 		top = append(top, t)
