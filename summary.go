@@ -11,8 +11,9 @@ import (
 )
 
 type Params struct {
-	Depth int `json:"depth"`
+	Depth int    `json:"depth"`
 	Power uint64 `json:"power"`
+	Chain string `json:"chain"`
 }
 
 type Summary struct {
@@ -36,7 +37,7 @@ func summarize(blocknum int, ts int64, proposer string, signers []string, addrs 
 	names := make(map[string]string)
 	powers := make(map[string]uint64)
 	for _, v := range validators {
-		names[v.ValidatorAddress] = v.Description.Moniker
+		names[v.ValidatorAddress] = bm.Sanitize(v.Description.Moniker)
 		powers[v.ValidatorAddress] = v.Tokens
 		s.VotePower += v.Tokens
 	}
@@ -121,7 +122,7 @@ func TopMissed(summaries []*Summary, blocks int, prefix, cosmosApi string) ([]*T
 		if tokens, e := strconv.ParseUint(weights.Validators[index[k]].Tokens, 10, 64); e == nil {
 			t.Votes = int64(tokens) / -1_000_000
 		}
-		t.Moniker = weights.Validators[index[k]].Description.Moniker
+		t.Moniker = bm.Sanitize(weights.Validators[index[k]].Description.Moniker)
 		top = append(top, t)
 	}
 	sort.Slice(top, func(i, j int) bool {
@@ -161,19 +162,19 @@ func SummariesToChart(s []*Summary) ([]byte, error) {
 }
 
 type ChartUpdate struct {
-	Block int `json:"block"`
-	Time string `json:"time"`
-	Missed int `json:"missed"`
+	Block   int     `json:"block"`
+	Time    string  `json:"time"`
+	Missed  int     `json:"missed"`
 	MissPct float64 `json:"missing_percent"`
-	Took float64 `json:"took"`
+	Took    float64 `json:"took"`
 }
 
 func SummaryToUpdate(s *Summary) []byte {
 	u := ChartUpdate{
-		Block:     s.BlockNum,
-		Time:      time.Unix(s.Timestamp/1000, 0).UTC().Format(time.Stamp),
-		Missed:    s.Missed,
-		Took:      s.DeltaSec,
+		Block:  s.BlockNum,
+		Time:   time.Unix(s.Timestamp/1000, 0).UTC().Format(time.Stamp),
+		Missed: s.Missed,
+		Took:   s.DeltaSec,
 	}
 	if s.VotePower > 0 {
 		u.MissPct = (float64(s.VoteMissing) / float64(s.VotePower)) * 100.0
@@ -181,4 +182,3 @@ func SummaryToUpdate(s *Summary) []byte {
 	j, _ := json.Marshal(u)
 	return j
 }
-

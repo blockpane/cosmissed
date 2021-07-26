@@ -19,6 +19,9 @@ const (
 
 type statusResp struct {
 	Result struct {
+		NodeInfo struct {
+			Network string `json:"network"`
+		} `json:"node_info"`
 		SyncInfo struct {
 			LatestBlockHeight string `json:"latest_block_height"`
 			CatchingUp        bool   `json:"catching_up"`
@@ -26,31 +29,33 @@ type statusResp struct {
 	} `json:"result"`
 }
 
-func CurrentHeight(tendermintUrl string) (int, error) {
+func CurrentHeight(tendermintUrl string) (curHeight int, networkName string, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", tendermintUrl+"/status", nil)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	sr := &statusResp{}
 	err = json.Unmarshal(body, sr)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	if sr.Result.SyncInfo.CatchingUp {
-		return 0, errors.New("node is catching up")
+		return 0, "", errors.New("node is catching up")
 	}
-	return strconv.Atoi(sr.Result.SyncInfo.LatestBlockHeight)
+	curHeight, err = strconv.Atoi(sr.Result.SyncInfo.LatestBlockHeight)
+	networkName = sr.Result.NodeInfo.Network
+	return
 }
 
 func fetch(height int, baseUrl, path string) ([]byte, error) {

@@ -1,23 +1,63 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Missed Blocks</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Missed Commit Monitor</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@5.0.2/dist/simplex/bootstrap.min.css">
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <link rel="icon" href="/img/favicon.png">
 </head>
 <body bgcolor='#fff'>
-<div id="main" style="width: 90%;height:600px;margin: auto;"></div>
-<div id="bottom" style="width: 75%;height: 300px;margin: auto;"></div>
+<div class="container container-fluid" style="margin-right:auto;margin-left:auto">
+  <div class="row mb-4 mt-3">
+    <div class="col">
+      <h3><span id="networkId" class="text-capitalize"></span> Missed Commit Monitor</h3>
+    </div>
+    <div class="col">
+      <div class="row">
+        <div class="col">
+          Showing last <span id="timeframe"></span> blocks
+        </div>
+        <div class="col">
+          Latest block is <span id="headblock" class="fw-bold"></span>
+        </div>
+        <div class="col">
+          +<span id="seconds" class="fw-bold"></span> seconds
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row">
+    <div style="height: 600px; width: 15%">
+      <div class="h5">Currently Missing:</div>
+      <div class="text-start fw-bold fs-6 text-wrap overflow-scroll">
+        <ol id="missing"></ol>
+      </div>
+    </div>
+    <div id="main" style="height: 600px; width: 85%"></div>
+  </div>
+  <div class="row mb-3">
+    <div id="bottom" style="height: 300px"></div>
+  </div>
+  <div class="row justify-content-center align-items-end">
+    <div class="position-relative bottom-0 start-50">
+      <br />
+      <br />
+      <a href="https://blockpane.com"><img src="img/bp-logo-text.svg" height="30" alt="© 2021 Block Pane LLC."></a>
+      <a href="https://github.com/blockpane/cosmissed"><img src="img/GitHub-Mark.png" height="30"></a>
+    </div>
+  </div>
+</div>
 <script src="js/chart.js"></script>
 <script src="js/top.js"></script>
+<script src="js/missing.js"></script>
 <script type="text/javascript">
     query();
     topMissed();
+    whosMissing();
 </script>
-<p align="center">
-  <br />
-  <br />
-  <a href="https://blockpane.com"><img src="img/bp-logo-text.svg" height="30" alt="© 2021 Block Pane LLC."></a>
-  <a href="https://github.com/blockpane/cosmissed"><img src="img/GitHub-Mark.png" height="30"></a></p>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
 </body>
 </html>

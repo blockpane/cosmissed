@@ -9,6 +9,8 @@ async function topMissed() {
             referrerPolicy: 'no-referrer'
         });
         const params = await resp.json()
+        document.getElementById('timeframe').innerHTML = params.depth;
+        document.getElementById('networkId').innerHTML = params.chain;
 
         const response = await fetch("/top", {
             method: 'GET',
@@ -48,7 +50,6 @@ async function topMissed() {
 
         let option;
         option = {
-            //backgroundColor: '#0e0e0e',
             backgroundColor: '#fff',
             tooltip: {
                 trigger: 'axis',
@@ -90,12 +91,10 @@ async function topMissed() {
                         opacity: 0.8,
                         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{
                             offset: 0,
-                            //color: 'rgb(30,21,79)'
                             color: 'rgb(0,0,0)'
                         }, {
                             offset: 1,
                             color: 'rgb(255,166,84)',
-                            //color: 'rgba(1, 191, 236)'
                         }])
                     },
                 },
@@ -115,12 +114,10 @@ async function topMissed() {
                         opacity: 0.8,
                         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{
                             offset: 0,
-                            //color: 'rgb(30,21,79)'
                             color: 'rgb(0,0,0)'
                         }, {
                             offset: 1,
                             color: 'rgb(89,71,190)'
-                            //color: 'rgba(1, 191, 236)'
                         }])
                     },
                 },

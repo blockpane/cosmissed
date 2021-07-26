@@ -15,7 +15,6 @@ async function query() {
         let option;
 
         option = {
-            //backgroundColor: '#0e0e0e',
             backgroundColor: '#fff',
             title: {
                 text: 'Missing Signatures',
@@ -32,15 +31,6 @@ async function query() {
                 data: ['legend 1', 'legend 2'],
                 left: 10
             },
-            toolbox: {
-                feature: {
-                    dataZoom: {
-                        yAxisIndex: 'none'
-                    },
-                    restore: {},
-                    saveAsImage: {}
-                }
-            },
             axisPointer: {
                 link: {xAxisIndex: 'all'}
             },
@@ -48,8 +38,11 @@ async function query() {
                 {
                     show: true,
                     realtime: true,
-                    start: 90,
+                    start: 95,
                     end: 100,
+                    zoomOnMouseWheel: false,
+                    moveOnMouseWheel: false,
+                    moveOnMouseMove: false,
                     xAxisIndex: [0, 1],
                     backgroundColor: 'rgba(104,104,104,0.22)',
                     dataBackground: {
@@ -63,8 +56,11 @@ async function query() {
                     type: 'inside',
                     backgroundColor: 'rgba(255,255,255,0.55)',
                     realtime: true,
-                    start: 90,
+                    start: 95,
                     end: 100,
+                    zoomOnMouseWheel: false,
+                    moveOnMouseWheel: false,
+                    moveOnMouseMove: false,
                     xAxisIndex: [0, 1]
                 }
             ],
@@ -98,7 +94,6 @@ async function query() {
                 {
                     name: 'Validators',
                     type: 'value',
-                    //max: 500
                 },
                 {
                     gridIndex: 1,
@@ -127,12 +122,10 @@ async function query() {
                         opacity: 0.8,
                         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{
                             offset: 0,
-                            //color: 'rgb(30,21,79)'
                             color: 'rgb(0,0,0)'
                         }, {
                             offset: 1,
                             color: 'rgb(89,71,190)'
-                            //color: 'rgba(1, 191, 236)'
                         }])
                     },
                 },
@@ -165,7 +158,6 @@ async function query() {
                             color: 'rgb(89,71,190)'
                         }, {
                             offset: 1,
-                            //color: 'rgb(30,21,79)'
                             color: 'rgb(0,0,0)'
                         }])
                     },
@@ -189,9 +181,6 @@ async function query() {
             option.dataZoom[1].end = e.end;
         };
         myChart.on('dataZoom', function(e) {
-            trackPos(e)
-        });
-        myChart.on('restore', function(e) {
             trackPos(e)
         });
 

@@ -17,7 +17,7 @@ func TestFetchSummary(t *testing.T) {
 	if os.Getenv("TENDERMINT_API") != "" {
 		tendermintApi = os.Getenv("TENDERMINT_API")
 	}
-	height, err := CurrentHeight(tendermintApi)
+	height, _, err := CurrentHeight(tendermintApi)
 	if err != nil {
 		t.Error(err)
 		return

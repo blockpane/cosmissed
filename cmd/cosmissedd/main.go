@@ -19,9 +19,9 @@ func main() {
 	l := log.New(os.Stderr, "cosmissed | ", log.Lshortfile|log.LstdFlags)
 
 	var (
-		current, successful, track, listen int
-		cosmosApi, tendermintApi, prefix   string
-		ready, stdout                      bool
+		current, successful, track, listen            int
+		cosmosApi, tendermintApi, prefix, networkName string
+		ready, stdout                                 bool
 	)
 
 	flag.StringVar(&cosmosApi, "c", "http://127.0.0.1:1317", "cosmos http API endpoint")
@@ -88,6 +88,7 @@ func main() {
 			cachedParams, e = json.Marshal(missed.Params{
 				Depth: track,
 				Power: sum.VotePower,
+				Chain: networkName,
 			})
 			if e != nil {
 				_ = l.Output(2, e.Error())
@@ -97,7 +98,9 @@ func main() {
 	}
 
 	newBlock := func() (new bool) {
-		h, e := missed.CurrentHeight(tendermintApi)
+		var h int
+		var e error
+		h, networkName, e = missed.CurrentHeight(tendermintApi)
 		if e != nil {
 			_ = l.Output(2, e.Error())
 			return false
