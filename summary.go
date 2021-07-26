@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -123,6 +124,9 @@ func TopMissed(summaries []*Summary, blocks int, prefix, cosmosApi string) ([]*T
 		t.Moniker = weights.Validators[index[k]].Description.Moniker
 		top = append(top, t)
 	}
+	sort.Slice(top, func(i, j int) bool {
+		return top[i].Missed > top[j].Missed
+	})
 	return top, nil
 }
 
@@ -145,7 +149,6 @@ func SummariesToChart(s []*Summary) ([]byte, error) {
 		MissPct: make([]float64, len(s)),
 	}
 	for i := range s {
-
 		bc.Blocks[i] = s[i].BlockNum
 		bc.Time[i] = time.Unix(s[i].Timestamp/1000, 0).UTC().Format(time.Stamp)
 		bc.Missed[i] = s[i].Missed
@@ -156,3 +159,26 @@ func SummariesToChart(s []*Summary) ([]byte, error) {
 	}
 	return json.MarshalIndent(bc, "", "  ")
 }
+
+type ChartUpdate struct {
+	Block int `json:"block"`
+	Time string `json:"time"`
+	Missed int `json:"missed"`
+	MissPct float64 `json:"missing_percent"`
+	Took float64 `json:"took"`
+}
+
+func SummaryToUpdate(s *Summary) []byte {
+	u := ChartUpdate{
+		Block:     s.BlockNum,
+		Time:      time.Unix(s.Timestamp/1000, 0).UTC().Format(time.Stamp),
+		Missed:    s.Missed,
+		Took:      s.DeltaSec,
+	}
+	if s.VotePower > 0 {
+		u.MissPct = (float64(s.VoteMissing) / float64(s.VotePower)) * 100.0
+	}
+	j, _ := json.Marshal(u)
+	return j
+}
+

@@ -18,25 +18,33 @@ async function topMissed() {
             redirect: 'error',
             referrerPolicy: 'no-referrer'
         });
-        const data = await response.json()
+        let data = await response.json()
 
         const chartDom = document.getElementById('bottom');
         chartDom.style.height = `${100+50*data.length}px`;
-        console.log(`${30*data.length}px`);
         const myChart = echarts.init(chartDom, 'shine');
 
-        let monikers = [];
-        let missed = [];
-        let votes = [];
+        const refresh = function (d) {
+            monikers = [];
+            missed = [];
+            votes = [];
+            d.sort((a, b) => {
+                if (a.missed_pct === b.missed_pct) {
+                    return b.votes-a.votes
+                }
+                return a.missed_pct-b.missed_pct
+            });
+            d.forEach ((d) => {
+                monikers.push(d.moniker);
+                const m = d.missed_pct.toFixed(4)
+                missed.push(m);
+                const v = ((d.votes*100000000)/params.power).toFixed(4)
+                votes.push(v);
+            })
+            return {monikers: monikers, missed: missed, votes: votes}
+        }
+        let missing = refresh(data)
 
-        data.sort((a, b) => {return a.missed_pct-b.missed_pct});
-        data.forEach ((d) => {
-            monikers.push(d.moniker);
-            const m = d.missed_pct.toFixed(4)
-            missed.push(m);
-            const v = ((d.votes*100000000)/params.power).toFixed(4)
-            votes.push(v);
-        })
 
         let option;
         option = {
@@ -63,7 +71,7 @@ async function topMissed() {
             },
             yAxis: {
                 type: 'category',
-                data: monikers
+                data: missing.monikers
             },
             series: [
                 {
@@ -77,7 +85,7 @@ async function topMissed() {
                     emphasis: {
                         focus: 'series'
                     },
-                    data: missed,
+                    data: missing.missed,
                     itemStyle: {
                         opacity: 0.8,
                         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{
@@ -102,7 +110,7 @@ async function topMissed() {
                     emphasis: {
                         focus: 'series'
                     },
-                    data: votes,
+                    data: missing.votes,
                     itemStyle: {
                         opacity: 0.8,
                         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{
@@ -120,6 +128,20 @@ async function topMissed() {
         };
 
         option && myChart.setOption(option);
+
+        let wsProto = "ws://"
+        if (location.protocol === "https:") {
+            wsProto = "wss://"
+        }
+        const socket = new WebSocket(wsProto+location.host+'/top/ws');
+        socket.addEventListener('message', function (event) {
+            missing = refresh(JSON.parse(event.data));
+            option.yAxis.data = missing.monikers;
+            option.series[0].data = missing.missed;
+            option.series[1].data = missing.votes;
+            chartDom.style.height = `${100+50*missing.monikers.length}px`;
+            myChart.setOption(option);
+        })
 
     } catch (e) {
         console.log(e.toString());

@@ -8,7 +8,7 @@ async function query() {
             redirect: 'error',
             referrerPolicy: 'no-referrer'
         });
-        const data = await response.json()
+        let data = await response.json()
 
         const chartDom = document.getElementById('main');
         const myChart = echarts.init(chartDom, 'shine');
@@ -181,6 +181,41 @@ async function query() {
         };
 
         option && myChart.setOption(option);
+
+        const trackPos = function (e) {
+            option.dataZoom[0].start = e.start;
+            option.dataZoom[1].start = e.start;
+            option.dataZoom[0].end = e.end;
+            option.dataZoom[1].end = e.end;
+        };
+        myChart.on('dataZoom', function(e) {
+            trackPos(e)
+        });
+        myChart.on('restore', function(e) {
+            trackPos(e)
+        });
+
+        let wsProto = "ws://"
+        if (location.protocol === "https:") {
+            wsProto = "wss://"
+        }
+        const socket = new WebSocket(wsProto+location.host+'/chart/ws');
+        socket.addEventListener('message', function (event) {
+            const upd = JSON.parse(event.data);
+            data.blocks.shift();
+            data.blocks.push(upd.block);
+            console.log(upd.block);
+            data.time.shift();
+            data.time.push(upd.time);
+            data.missed.shift();
+            data.missed.push(upd.missed);
+            data.missing_percent.shift();
+            data.missing_percent.push(upd.missing_percent);
+            data.took.shift();
+            data.took.push(upd.took);
+            myChart.setOption(option);
+        });
+
     } catch (e) {
         console.log(e.toString());
     }

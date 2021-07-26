@@ -54,10 +54,12 @@ func main() {
 			l.Println(err)
 			return
 		}
-		cachedTop = j
-		err = bcastTop.Send(j)
-		if err != nil {
-			l.Println(err)
+		if string(cachedTop) != string(j) {
+			cachedTop = j
+			err = bcastTop.Send(j)
+			if err != nil {
+				l.Println(err)
+			}
 		}
 	}
 
@@ -74,13 +76,15 @@ func main() {
 			if e != nil {
 				_ = l.Output(2, e.Error())
 			}
-			e = bcastChart.Send([]byte(fmt.Sprintf(`{"blocks":%d,"time":%d,"missed":%d,"took":%f}`, sum.BlockNum, sum.Timestamp, sum.Missed, sum.DeltaSec)))
 			if stdout {
 				fmt.Println(string(j))
 			}
+
+			e = bcastChart.Send(missed.SummaryToUpdate(sum))
 			if e != nil {
 				_ = l.Output(2, e.Error())
 			}
+
 			cachedParams, e = json.Marshal(missed.Params{
 				Depth: track,
 				Power: sum.VotePower,
@@ -88,10 +92,7 @@ func main() {
 			if e != nil {
 				_ = l.Output(2, e.Error())
 			}
-			// every 10 blocks recalculate the top missing
-			if sum.BlockNum%10 == 0 {
-				top()
-			}
+			top()
 		}
 	}
 
