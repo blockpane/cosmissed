@@ -24,9 +24,9 @@ async function whosMissing() {
             monikers.forEach((moniker) => {
                 let li = document.createElement("li")
                 li.appendChild(document.createTextNode(moniker));
-                missing.appendChild(li)
-                console.log(moniker+" is missing signatures")
-            })
+                missing.appendChild(li);
+                console.log(moniker+" is missing signatures");
+            });
         }
         document.getElementById('headblock').innerHTML = upd.block_num;
         document.getElementById('seconds').innerHTML = upd.delta_sec;

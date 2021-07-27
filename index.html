@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Missed Commit Monitor</title>
+  <title>Missed Pre/Commit Monitor</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@5.0.2/dist/simplex/bootstrap.min.css">
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
   <link rel="icon" href="/img/favicon.png">
@@ -29,15 +29,15 @@
     </div>
   </div>
   <div class="row">
-    <div style="height: 600px; width: 15%">
+    <div class="col-2" style="height: 600px">
       <div class="h5">Currently Missing:</div>
       <div class="text-start fw-bold fs-6 text-wrap overflow-scroll">
         <ol id="missing"></ol>
       </div>
     </div>
-    <div id="main" style="height: 600px; width: 85%"></div>
+    <div class="col-10" id="main" style="height: 600px"></div>
   </div>
-  <div class="row mb-3">
+  <div class="row mb-3 mt-3">
     <div id="bottom" style="height: 300px"></div>
   </div>
   <div class="row justify-content-center align-items-end">

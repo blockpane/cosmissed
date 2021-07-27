@@ -31,7 +31,9 @@ async function topMissed() {
             missed = [];
             votes = [];
             d.sort((a, b) => {
-                if (a.missed_pct === b.missed_pct) {
+                if (a.missed_pct === 0 && b.missed_pct === 0) {
+                    return a.votes-b.votes
+                } else if (a.missed_pct === b.missed_pct) {
                     return b.votes-a.votes
                 }
                 return a.missed_pct-b.missed_pct
@@ -99,7 +101,7 @@ async function topMissed() {
                     },
                 },
                 {
-                    name: '% Consensus Reduced',
+                    name: '% Impact vs. Consensus',
                     type: 'bar',
                     stack: 'total',
                     label: {

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -17,22 +18,24 @@ type Params struct {
 }
 
 type Summary struct {
-	BlockNum    int               `json:"block_num"`
-	Timestamp   int64             `json:"timestamp"`
-	DeltaSec    float64           `json:"delta_sec"`
-	Missed      int               `json:"missed"`
-	Validators  map[string]string `json:"missing"`
-	Proposer    string            `json:"proposer"`
-	VotePower   uint64            `json:"vote_power"`
-	VoteMissing uint64            `json:"vote_missing"`
+	BlockNum           int               `json:"block_num"`
+	Timestamp          int64             `json:"timestamp"`
+	DeltaSec           float64           `json:"delta_sec"`
+	Missed             int               `json:"missed"`
+	MissingValidators  map[string]string `json:"missing"`
+	PresentValidators  map[string]string `json:"-"`
+	Proposer           string            `json:"proposer"`
+	VotePower          uint64            `json:"vote_power"`
+	VoteMissing        uint64            `json:"vote_missing"`
 }
 
 func summarize(blocknum int, ts int64, proposer string, signers []string, addrs map[string]bool, valcons map[string]string, validators []Validator) *Summary {
 	s := Summary{
-		BlockNum:   blocknum,
-		Timestamp:  ts,
-		Missed:     len(addrs) - len(signers),
-		Validators: make(map[string]string),
+		BlockNum:          blocknum,
+		Timestamp:         ts,
+		Missed:            len(addrs) - len(signers),
+		MissingValidators: make(map[string]string),
+		PresentValidators: make(map[string]string),
 	}
 	names := make(map[string]string)
 	powers := make(map[string]uint64)
@@ -47,9 +50,13 @@ func summarize(blocknum int, ts int64, proposer string, signers []string, addrs 
 	}
 	for k, v := range addrs {
 		if !v {
-			s.Validators[names[k]] = valcons[k]
+			s.MissingValidators[strings.TrimSpace(bm.Sanitize(names[k]))] = valcons[k]
 			s.VoteMissing += powers[k]
+			delete(addrs, k)
 		}
+	}
+	for k := range addrs {
+		s.PresentValidators[strings.TrimSpace(bm.Sanitize(names[k]))] = valcons[k]
 	}
 	return &s
 }
@@ -99,9 +106,12 @@ func TopMissed(summaries []*Summary, blocks int, prefix, cosmosApi string) ([]*T
 	// tally up misses
 	counts := make(map[string]int)
 	for _, s := range summaries {
-		if s != nil && s.Missed > 0 {
-			for _, v := range s.Validators {
+		if s != nil {
+			for _, v := range s.MissingValidators {
 				counts[v] += 1
+			}
+			for _, v := range s.PresentValidators {
+				counts[v] += 0
 			}
 		}
 	}
@@ -124,6 +134,12 @@ func TopMissed(summaries []*Summary, blocks int, prefix, cosmosApi string) ([]*T
 		}
 		t.Moniker = bm.Sanitize(weights.Validators[index[k]].Description.Moniker)
 		top = append(top, t)
+	}
+	for i := range top {
+		top[i].Moniker = strings.TrimRight(top[i].Moniker, "🟢")
+		if top[i].Missed == 0 {
+			top[i].Moniker = top[i].Moniker+" 🟢"
+		}
 	}
 	sort.Slice(top, func(i, j int) bool {
 		return top[i].Missed > top[j].Missed
