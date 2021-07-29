@@ -15,8 +15,8 @@ async function whosMissing() {
         }
         if (monikers.length > 0) {
             monikers.sort(function(a, b) {
-                let nameA = a.name.toUpperCase();
-                let nameB = b.name.toUpperCase();
+                const nameA = a.toUpperCase();
+                const nameB = b.toUpperCase();
                 if (nameA < nameB) {return -1;}
                 if (nameA > nameB) {return 1;}
                 return 0;
