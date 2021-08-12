@@ -20,7 +20,7 @@ type Params struct {
 type Summary struct {
 	BlockNum           int               `json:"block_num"`
 	Timestamp          int64             `json:"timestamp"`
-	DeltaSec           float64           `json:"delta_sec"`
+	DeltaSec           float64           `json:"delta_sec,omitempty"`
 	Missed             int               `json:"missed"`
 	MissingValidators  map[string]string `json:"missing"`
 	PresentValidators  map[string]string `json:"-"`

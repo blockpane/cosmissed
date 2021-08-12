@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -37,6 +38,7 @@ func main() {
 	cachedTop := []byte("not ready")
 	cachedChart := []byte("not ready")
 	cachedParams := []byte("not ready")
+	blockError := []byte(`{"missing":{"fetch error":""}}`)
 
 	results := make([]*missed.Summary, track)
 	var bcastMissed, bcastTop, bcastChart broadcast.Broadcaster
@@ -216,6 +218,7 @@ func main() {
 
 	http.Handle("/js/", http.FileServer(http.FS(missed.Js)))
 	http.Handle("/img/", http.FileServer(http.FS(missed.Js)))
+	http.Handle("/css/", http.FileServer(http.FS(missed.Js)))
 
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
@@ -231,6 +234,33 @@ func main() {
 		case "/params":
 			setJsonHeader(writer)
 			_, _ = writer.Write(cachedParams)
+		case "/block":
+			params := request.URL.Query()
+			if params["num"] == nil || len(params["num"]) != 1 {
+				writer.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			block, err := strconv.ParseUint(params["num"][0], 10, 32)
+			if err != nil {
+				writer.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			var s *missed.Summary
+			s, err = missed.FetchSummary(cosmosApi, tendermintApi, int(block))
+			if err != nil {
+				writer.WriteHeader(http.StatusInternalServerError)
+				_, _ = writer.Write(blockError)
+				return
+			}
+			var j []byte
+			j, err = json.Marshal(s)
+			if err != nil {
+				writer.WriteHeader(http.StatusInternalServerError)
+				_, _ = writer.Write(blockError)
+				return
+			}
+			setJsonHeader(writer)
+			_, _ = writer.Write(j)
 		case "/", "/index.html":
 			writer.Header().Set("Server", "cosmissed")
 			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
