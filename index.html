@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Missed Pre/Commit Monitor</title>
   <link rel="stylesheet" href="css/bootstrap.min.css">
   <script src="js/echarts.min.js"></script>
   <link rel="icon" href="/img/favicon.png">
 </head>
-<body onload="init()" bgcolor='#fff'>
-<div class="container container-fluid" style="margin-right:auto;margin-left:auto">
-  <div class="row mb-4 mt-3">
+<body onload="init()">
+<div class="container-fluid" style="padding-top: 20px;">
+  <div class="row" style="padding-bottom: 20px;">
     <div class="col">
       <h3><span id="networkId" class="text-capitalize"></span> Missed Commit Monitor</h3>
     </div>
@@ -27,28 +27,27 @@
         </div>
       </div>
     </div>
+    <div>&nbsp;</div>
   </div>
   <div class="row">
-    <div class="col-2" style="height: 600px">
-      <div class="h5" id="missingWhen">Currently Missing:</div>
-      <div class="text-start fw-bold fs-6 overflow-scroll">
-        <ol id="missing"></ol>
+    <div class="col-12" style="padding-right: 0;">
+      <div class="row justify-content-center" id="main" style="height: 500px"></div>
+      <div class="row text-md-center" style="padding-top: 10px;">
+        <div class="col-2">
+          <div class="h5" id="missingWhen">Currently Missing:</div>
+          <div class="text-start fw-bold fs-6">
+            <ol id="missing"></ol>
+          </div>
+        </div>
+      <div class="col-10" id="bottom"></div>
       </div>
     </div>
-    <div class="col-10" id="main" style="height: 600px"></div>
   </div>
-  <div class="row mb-3 mt-3">
-    <div id="bottom" style="height: 300px"></div>
-  </div>
-  <div class="row justify-content-center align-items-end">
-    <div class="position-relative bottom-0 start-50">
-      <br />
-      <br />
-      <a href="https://blockpane.com"><img src="img/bp-logo-text.svg" height="30" alt="© 2021 Block Pane LLC."></a>
+  <div class="row">
+    <p align="center">
+      <a href="https://blockpane.com"><img src="img/bp-logo-text.svg" height="30" alt="© 2021 Block Pane LLC."></a>&nbsp;
       <a href="https://github.com/blockpane/cosmissed"><img src="img/GitHub-Mark.png" height="30"></a>
-      <br />
-      &nbsp;
-    </div>
+    </p>
   </div>
 </div>
 <script src="js/chart.js"></script>
