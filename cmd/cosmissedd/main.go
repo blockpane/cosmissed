@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -12,19 +13,31 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
 const lagBlocks = 3
+
+type savedState struct {
+	CachedResult []byte
+	CachedTop    []byte
+	CachedChart  []byte
+	CachedParams []byte
+	BlockError   []byte
+	Results      []*missed.Summary
+	Successful   int
+}
 
 func main() {
 	l := log.New(os.Stderr, "cosmissed | ", log.Lshortfile|log.LstdFlags)
 
 	var (
 		current, successful, track, listen                    int
-		cosmosApi, tendermintApi, prefix, networkName, socket string
+		cosmosApi, tendermintApi, prefix, networkName, socket, cacheFile string
 		ready, stdout                                         bool
 	)
 
@@ -32,6 +45,7 @@ func main() {
 	flag.StringVar(&tendermintApi, "t", "http://127.0.0.1:26657", "tendermint http API endpoint")
 	flag.StringVar(&prefix, "p", "cosmos", "address prefix, ex- cosmos = cosmosvaloper, cosmosvalcons ...")
 	flag.StringVar(&socket, "socket", "", "filename for unix socket to listen on, if set will disable TCP listener")
+	flag.StringVar(&cacheFile, "cache", "cosmissed.dat", "filename for caching previous blocks")
 	flag.IntVar(&listen, "l", 8080, "webserver port to listen on")
 	flag.IntVar(&track, "n", 3000, "most recent blocks to track")
 	flag.BoolVar(&stdout, "v", false, "log new records to stdout (error logs already on stderr)")
@@ -74,8 +88,37 @@ func main() {
 	cachedChart := []byte("not ready")
 	cachedParams := []byte("not ready")
 	blockError := []byte(`{"missing":{"fetch error":""}}`)
+	var results []*missed.Summary
 
-	results := make([]*missed.Summary, track)
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigs
+		l.Println("received", sig, "attempting to save state")
+		f, e := os.OpenFile(cacheFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+		if e != nil {
+			l.Println(e)
+			os.Exit(1)
+		}
+		defer f.Close()
+		out := gob.NewEncoder(f)
+		e = out.Encode(&savedState{
+			CachedResult: cachedResult,
+			CachedTop:    cachedTop,
+			CachedChart:  cachedChart,
+			CachedParams: cachedParams,
+			BlockError:   blockError,
+			Results:      results,
+			Successful:   successful,
+		})
+		if e != nil {
+			l.Println(e)
+			os.Exit(1)
+		}
+		l.Fatal("exiting")
+	}()
+
 	var bcastMissed, bcastTop, bcastChart broadcast.Broadcaster
 	defer bcastMissed.Discard()
 	defer bcastTop.Discard()
@@ -171,10 +214,41 @@ func main() {
 		flag.PrintDefaults()
 		l.Fatalln("cannot get current block, giving up")
 	}
-	successful = current - track - lagBlocks - 1
-	l.Printf("fetching last %d blocks, please wait\n", track)
-	refresh()
-	top()
+	if !func() bool {
+		f, e := os.Open(cacheFile)
+		if e != nil {
+			l.Println("could not load existing cache file, starting with clean state:", e.Error())
+			return false
+		}
+		defer f.Close()
+		enc := gob.NewDecoder(f)
+		state := &savedState{}
+		e = enc.Decode(state)
+		if e != nil {
+			l.Println("could not decode cache file, removing old file and starting with clean state:", e.Error())
+			defer os.Remove(cacheFile)
+			return false
+		}
+		if state.BlockError == nil || state.Results == nil || state.CachedTop == nil || state.CachedParams == nil || state.CachedChart == nil || state.CachedResult == nil {
+			l.Println("cache file had invalid data, starting with clean state")
+			defer os.Remove(cacheFile)
+			return false
+		}
+		cachedResult = state.CachedResult
+		cachedTop = state.CachedTop
+		cachedChart = state.CachedChart
+		cachedParams = state.CachedParams
+		blockError = state.BlockError
+		results = state.Results
+		successful = state.Successful
+		return true
+	}() {
+		results = make([]*missed.Summary, track)
+		successful = current - track - lagBlocks - 1
+		l.Printf("fetching last %d blocks, please wait\n", track)
+		refresh()
+		top()
+	}
 	ready = true
 	logmod = 10
 	l.Println("cache populated, starting server.")
