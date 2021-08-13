@@ -101,6 +101,14 @@ async function query() {
                     z: 0,
                     smooth: true,
                     symbolSize: 0,
+
+                    // little hack that makes the chart clickable, only the "symbol" will emit a mouse click event,
+                    // this will create a giant clear svg and overlay so the whole series is clickable:
+                    symbol: 'image://data:image/svg;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjYwMCI+CiAgICA8cGF0aCBmaWxsPSJub25lIiBzdHJva2U9IiNGRkYiIHN0cm9rZS13aWR0aD0iMCIgZD0ibTAsMGg0ODB2MjcwSDB6Ii8+Cjwvc3ZnPg==',
+                    symbolSize: [200, 600],
+                    symbolOffset: [0, "50%"],
+                    showSymbol: false,
+
                     hoverAnimation: false,
                     data: data.missed,
                     lineStyle: {
@@ -123,8 +131,6 @@ async function query() {
                     z: 1,
                     step: 'end',
 
-                    // little hack that makes the chart clickable, only the "symbol" will emit a mouse click event,
-                    // this will create a giant clear svg and overlay so the whole series is clickable:
                     symbol: 'image://data:image/svg;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjYwMCI+CiAgICA8cGF0aCBmaWxsPSJub25lIiBzdHJva2U9IiNGRkYiIHN0cm9rZS13aWR0aD0iMCIgZD0ibTAsMGg0ODB2MjcwSDB6Ii8+Cjwvc3ZnPg==',
                     symbolSize: [200, 600],
                     symbolOffset: [0, "50%"],
@@ -146,7 +152,7 @@ async function query() {
                     yAxisIndex: 1,
                     symbol: 'image://data:image/svg;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjYwMCI+CiAgICA8cGF0aCBmaWxsPSJub25lIiBzdHJva2U9IiNGRkYiIHN0cm9rZS13aWR0aD0iMCIgZD0ibTAsMGg0ODB2MjcwSDB6Ii8+Cjwvc3ZnPg==',
                     symbolSize: [200, 600],
-                    symbolOffset: [0, "50%"],
+                    //symbolOffset: [0, "50%"],
                     showSymbol: false,
                     hoverAnimation: false,
                     data: data.took,
