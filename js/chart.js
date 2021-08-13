@@ -36,7 +36,7 @@ async function query() {
                 {
                     show: true,
                     realtime: true,
-                    start: 90,
+                    start: 97,
                     end: 100,
                     zoomOnMouseWheel: false,
                     moveOnMouseWheel: false,
@@ -135,7 +135,7 @@ async function query() {
                     lineStyle: {
                         color: 'rgb(238,131,25)',
                         width: 2.0,
-                        type: 'dashed',
+                        type: 'dotted',
                     },
                 },
                 {

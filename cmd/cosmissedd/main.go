@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -8,9 +9,11 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/textileio/go-threads/broadcast"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -20,19 +23,51 @@ func main() {
 	l := log.New(os.Stderr, "cosmissed | ", log.Lshortfile|log.LstdFlags)
 
 	var (
-		current, successful, track, listen            int
-		cosmosApi, tendermintApi, prefix, networkName string
-		ready, stdout                                 bool
+		current, successful, track, listen                    int
+		cosmosApi, tendermintApi, prefix, networkName, socket string
+		ready, stdout                                         bool
 	)
 
 	flag.StringVar(&cosmosApi, "c", "http://127.0.0.1:1317", "cosmos http API endpoint")
 	flag.StringVar(&tendermintApi, "t", "http://127.0.0.1:26657", "tendermint http API endpoint")
 	flag.StringVar(&prefix, "p", "cosmos", "address prefix, ex- cosmos = cosmosvaloper, cosmosvalcons ...")
+	flag.StringVar(&socket, "socket", "", "filename for unix socket to listen on, if set will disable TCP listener")
 	flag.IntVar(&listen, "l", 8080, "webserver port to listen on")
 	flag.IntVar(&track, "n", 3000, "most recent blocks to track")
 	flag.BoolVar(&stdout, "v", false, "log new records to stdout (error logs already on stderr)")
 
 	flag.Parse()
+
+	switch {
+	case strings.HasPrefix(cosmosApi, "unix://"):
+		l.Println("Using socket:", strings.Replace(cosmosApi, `unix://`, "", 1))
+		missed.CClient = &http.Client{
+			Transport: &http.Transport{
+				DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+					return net.Dial("unix", strings.Replace(cosmosApi, `unix://`, "", 1))
+				},
+			},
+		}
+		missed.CUrl = `http://unix`
+	default:
+		missed.CClient = http.DefaultClient
+		missed.CUrl = cosmosApi
+	}
+	switch {
+	case strings.HasPrefix(tendermintApi, `unix://`):
+		l.Println("Using socket:", strings.Replace(tendermintApi, `unix://`, "", 1))
+		missed.TClient = &http.Client{
+			Transport: &http.Transport{
+				DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+					return net.Dial("unix", strings.Replace(tendermintApi, `unix://`, "", 1))
+				},
+			},
+		}
+		missed.TUrl = `http://unix`
+	default:
+		missed.TClient = http.DefaultClient
+		missed.TUrl = tendermintApi
+	}
 
 	cachedResult := []byte("not ready")
 	cachedTop := []byte("not ready")
@@ -46,7 +81,7 @@ func main() {
 	defer bcastTop.Discard()
 
 	top := func() {
-		t, err := missed.TopMissed(results, track, prefix, cosmosApi)
+		t, err := missed.TopMissed(results, track, prefix)
 		if err != nil {
 			l.Println(err)
 			return
@@ -102,7 +137,7 @@ func main() {
 	newBlock := func() (new bool) {
 		var h int
 		var e error
-		h, networkName, e = missed.CurrentHeight(tendermintApi)
+		h, networkName, e = missed.CurrentHeight()
 		if e != nil {
 			_ = l.Output(2, e.Error())
 			return false
@@ -117,7 +152,7 @@ func main() {
 	logmod := 100
 	refresh := func() {
 		for i := successful + 1; i < current; i++ {
-			summary, e := missed.FetchSummary(cosmosApi, tendermintApi, i)
+			summary, e := missed.FetchSummary(i)
 			if e != nil {
 				_ = l.Output(2, e.Error())
 				return
@@ -246,7 +281,7 @@ func main() {
 				return
 			}
 			var s *missed.Summary
-			s, err = missed.FetchSummary(cosmosApi, tendermintApi, int(block))
+			s, err = missed.FetchSummary(int(block))
 			if err != nil {
 				writer.WriteHeader(http.StatusInternalServerError)
 				_, _ = writer.Write(blockError)
@@ -268,6 +303,15 @@ func main() {
 			_, _ = writer.Write(missed.IndexHtml)
 		}
 	})
+	if socket != "" {
+		server := http.Server{}
+		unixListener, err := net.Listen("unix", socket)
+		if err != nil {
+			l.Fatal(err)
+		}
+		defer os.Remove(socket)
+		l.Fatal(server.Serve(unixListener))
+	}
 
 	l.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", listen), nil))
 }

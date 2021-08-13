@@ -1,4 +1,6 @@
 .idea
 local/*
 .DS_Store
+docker-compose.yaml
+dist
 

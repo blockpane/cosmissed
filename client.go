@@ -29,14 +29,14 @@ type statusResp struct {
 	} `json:"result"`
 }
 
-func CurrentHeight(tendermintUrl string) (curHeight int, networkName string, err error) {
+func CurrentHeight() (curHeight int, networkName string, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", tendermintUrl+"/status", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", TUrl+"/status", nil)
 	if err != nil {
 		return 0, "", err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := TClient.Do(req)
 	if err != nil {
 		return 0, "", err
 	}
@@ -58,14 +58,14 @@ func CurrentHeight(tendermintUrl string) (curHeight int, networkName string, err
 	return
 }
 
-func fetch(height int, baseUrl, path string) ([]byte, error) {
+func fetch(height int, client *http.Client, baseUrl, path string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", baseUrl+path+strconv.Itoa(height), nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -73,16 +73,16 @@ func fetch(height int, baseUrl, path string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-func FetchSummary(cosmosApi, tendermintApi string, height int) (*Summary, error) {
+func FetchSummary(height int) (*Summary, error) {
 	m := minSignatures{}
-	b, err := fetch(height, tendermintApi, commitPath)
+	b, err := fetch(height, TClient, TUrl, commitPath)
 	if err != nil {
 		return nil, err
 	}
 	err = json.Unmarshal(b, &m)
 	proposer, ts, signers := m.parse()
 	v := minValidatorSet{}
-	b, err = fetch(height, cosmosApi, validatorsetsPath)
+	b, err = fetch(height, CClient, CUrl, validatorsetsPath)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func FetchSummary(cosmosApi, tendermintApi string, height int) (*Summary, error)
 		return nil, err
 	}
 	addrs, cons := v.parse()
-	b, err = fetch(height, cosmosApi, historicalPath)
+	b, err = fetch(height, CClient, CUrl, historicalPath)
 	if err != nil {
 		return nil, err
 	}

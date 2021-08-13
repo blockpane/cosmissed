@@ -18,15 +18,15 @@ type Params struct {
 }
 
 type Summary struct {
-	BlockNum           int               `json:"block_num"`
-	Timestamp          int64             `json:"timestamp"`
-	DeltaSec           float64           `json:"delta_sec,omitempty"`
-	Missed             int               `json:"missed"`
-	MissingValidators  map[string]string `json:"missing"`
-	PresentValidators  map[string]string `json:"-"`
-	Proposer           string            `json:"proposer"`
-	VotePower          uint64            `json:"vote_power"`
-	VoteMissing        uint64            `json:"vote_missing"`
+	BlockNum          int               `json:"block_num"`
+	Timestamp         int64             `json:"timestamp"`
+	DeltaSec          float64           `json:"delta_sec,omitempty"`
+	Missed            int               `json:"missed"`
+	MissingValidators map[string]string `json:"missing"`
+	PresentValidators map[string]string `json:"-"`
+	Proposer          string            `json:"proposer"`
+	VotePower         uint64            `json:"vote_power"`
+	VoteMissing       uint64            `json:"vote_missing"`
 }
 
 func summarize(blocknum int, ts int64, proposer string, signers []string, addrs map[string]bool, valcons map[string]string, validators []Validator) *Summary {
@@ -81,15 +81,15 @@ type minValidators struct {
 	} `json:"validators"`
 }
 
-func TopMissed(summaries []*Summary, blocks int, prefix, cosmosApi string) ([]*Top, error) {
+func TopMissed(summaries []*Summary, blocks int, prefix string) ([]*Top, error) {
 	// get current vote power:
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", cosmosApi+"/cosmos/staking/v1beta1/validators?pagination.limit=1000", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", CUrl+"/cosmos/staking/v1beta1/validators?pagination.limit=1000", nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := CClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func TopMissed(summaries []*Summary, blocks int, prefix, cosmosApi string) ([]*T
 	for i := range top {
 		top[i].Moniker = strings.TrimRight(top[i].Moniker, "🟢")
 		if top[i].Missed == 0 {
-			top[i].Moniker = top[i].Moniker+" 🟢"
+			top[i].Moniker = top[i].Moniker + " 🟢"
 		}
 	}
 	sort.Slice(top, func(i, j int) bool {
