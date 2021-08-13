@@ -132,15 +132,24 @@ async function topMissed() {
         if (location.protocol === "https:") {
             wsProto = "wss://"
         }
-        const socket = new WebSocket(wsProto+location.host+'/top/ws');
-        socket.addEventListener('message', function (event) {
-            missing = refresh(JSON.parse(event.data));
-            option.yAxis.data = missing.monikers;
-            option.series[0].data = missing.missed;
-            option.series[1].data = missing.votes;
-            chartDom.style.height = `${100+50*missing.monikers.length}px`;
-            myChart.setOption(option);
-        })
+        function connectTop() {
+            const socket = new WebSocket(wsProto + location.host + '/top/ws');
+            socket.addEventListener('message', function (event) {
+                missing = refresh(JSON.parse(event.data));
+                option.yAxis.data = missing.monikers;
+                option.series[0].data = missing.missed;
+                option.series[1].data = missing.votes;
+                chartDom.style.height = `${100 + 50 * missing.monikers.length}px`;
+                myChart.setOption(option);
+            });
+            socket.onclose = function(e) {
+                console.log('Socket is closed, retrying /top/ws ...', e.reason);
+                setTimeout(function() {
+                    connectTop();
+                }, 4000);
+            };
+        }
+        connectTop()
 
     } catch (e) {
         console.log(e.toString());

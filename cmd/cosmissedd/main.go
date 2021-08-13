@@ -98,8 +98,7 @@ func main() {
 		l.Println("received", sig, "attempting to save state")
 		f, e := os.OpenFile(cacheFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 		if e != nil {
-			l.Println(e)
-			os.Exit(1)
+			l.Fatal(e)
 		}
 		defer f.Close()
 		out := gob.NewEncoder(f)
@@ -113,8 +112,7 @@ func main() {
 			Successful:   successful,
 		})
 		if e != nil {
-			l.Println(e)
-			os.Exit(1)
+			l.Fatal(e)
 		}
 		l.Fatal("exiting")
 	}()

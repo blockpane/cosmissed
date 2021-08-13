@@ -239,45 +239,66 @@ async function query() {
         if (location.protocol === "https:") {
             wsProto = "wss://"
         }
-        const socket = new WebSocket(wsProto+location.host+'/chart/ws');
-        socket.addEventListener('message', function (event) {
-            const upd = JSON.parse(event.data);
-            data.blocks.shift();
-            data.blocks.push(upd.block);
-            data.time.shift();
-            data.time.push(upd.time);
-            data.missed.shift();
-            data.missed.push(upd.missed);
-            data.missing_percent.shift();
-            data.missing_percent.push(upd.missing_percent);
-            data.took.shift();
-            data.took.push(upd.took);
-            if (updating) {
-                missingChart.setOption(option);
-            }
-        });
+        function connectChart() {
+            const socket = new WebSocket(wsProto + location.host + '/chart/ws');
+            socket.addEventListener('message', function (event) {
+                const upd = JSON.parse(event.data);
+                data.blocks.shift();
+                data.blocks.push(upd.block);
+                data.time.shift();
+                data.time.push(upd.time);
+                data.missed.shift();
+                data.missed.push(upd.missed);
+                data.missing_percent.shift();
+                data.missing_percent.push(upd.missing_percent);
+                data.took.shift();
+                data.took.push(upd.took);
+                if (updating) {
+                    missingChart.setOption(option);
+                }
+            });
+            socket.onclose = function(e) {
+                console.log('Socket is closed, retrying /chart/ws ...', e.reason);
+                setTimeout(function() {
+                    connectChart();
+                }, 4000);
+            };
+        }
+        connectChart()
 
         let locked = false;
-        const tableSocket = new WebSocket(wsProto+location.host+'/missed/ws');
-        tableSocket.addEventListener('message', function (event) {
-            let upd = JSON.parse(event.data);
-            if (updating && !locked) {
-                locked = true;
-                setTimeout(function (){
-                    if (!updating) {
+        function connectMissed() {
+            const tableSocket = new WebSocket(wsProto + location.host + '/missed/ws');
+            tableSocket.addEventListener('message', function (event) {
+                let upd = JSON.parse(event.data);
+                if (updating && !locked) {
+                    locked = true;
+                    setTimeout(function () {
+                        if (!updating) {
+                            locked = false
+                            return
+                        }
+                        pauseOffset = 0;
+                        setMissing("Currently Missing:", upd)
                         locked = false
-                        return
-                    }
-                    pauseOffset = 0;
-                    setMissing("Currently Missing:", upd)
-                    locked = false
-                }, 3000)
-            } else {
-                pauseOffset += 1;
-            }
-            document.getElementById('headblock').innerHTML = upd.block_num;
-            document.getElementById('seconds').innerHTML = upd.delta_sec;
-        });
+                    }, 3000)
+                } else {
+                    pauseOffset += 1;
+                }
+                document.getElementById('headblock').innerHTML = upd.block_num;
+                document.getElementById('seconds').innerHTML = upd.delta_sec;
+            });
+            tableSocket.onclose = function(e) {
+                console.log('Socket is closed, retrying /missed/ws ...', e.reason);
+                setMissing("⚠️ Not Connected", {missing:{"error": ""}})
+                document.getElementById('headblock').innerHTML = "unknown";
+                document.getElementById('seconds').innerHTML = " ⚠️ ";
+                setTimeout(function() {
+                    connectMissed();
+                }, 4000);
+            };
+        }
+        connectMissed()
 
     } catch (e) {
         console.log(e.toString());
