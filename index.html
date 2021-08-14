@@ -17,7 +17,7 @@
     <div class="col">
       <div class="row">
         <div class="col">
-          Showing last <span id="timeframe"></span> blocks
+          Data for last <span id="timeframe"></span> blocks
         </div>
         <div class="col">
           Latest block is <span id="headblock" class="fw-bold"></span>
@@ -31,15 +31,27 @@
   </div>
   <div class="row">
     <div class="col-12" style="padding-right: 0;">
-      <div class="row justify-content-center" id="main" style="height: 500px"></div>
+        <div class="row justify-content-center">
+          <div class="col-12" id="main" style="height: 500px"></div>
+        </div>
       <div class="row text-md-center" style="padding-top: 10px;">
         <div class="col-2">
-          <div class="h5" id="missingWhen">Currently Missing:</div>
+          <div class="h5" id="missingWhen"></div>
           <div class="text-start fw-bold fs-6">
             <ol id="missing"></ol>
           </div>
         </div>
-      <div class="col-10" id="bottom"></div>
+        <div class="col-8">
+          <div class="row" style="padding-bottom: 0;">
+            <h5 align="center">
+              % Missed | Consensus %
+            </h5>
+          </div>
+          <div class="row" id="bottom" style="padding-bottom: 0;"></div>
+        </div>
+        <!-- div class="col-2">
+          TODO: slashed.
+        </div -->
       </div>
     </div>
   </div>

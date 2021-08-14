@@ -54,12 +54,12 @@ async function query() {
             grid: [{
                 left: 50,
                 right: 50,
-                height: '45%'
+                height: '57%'
             }, {
                 left: 50,
                 right: 50,
-                top: '55%',
-                height: '25%'
+                top: '75%',
+                height: '20%'
             }],
             xAxis: [
                 {
@@ -121,8 +121,13 @@ async function query() {
                             color: 'rgb(0,0,0)'
                         }, {
                             offset: 1,
-                            color: 'rgb(89,71,190)'
-                        }])
+                            color: 'rgb(109,91,210)'
+                            //color: 'rgb(89,71,190)'
+                        }]),
+                        shadowColor: 'rgb(109,91,210,0.3)',
+                        shadowBlur: 4,
+                        shadowOffsetY: -2,
+                        shadowOffsetX: 0,
                     },
                 },
                 {
@@ -164,7 +169,11 @@ async function query() {
                         }, {
                             offset: 1,
                             color: 'rgb(0,0,0)'
-                        }])
+                        }]),
+                        shadowColor: 'rgb(0,0,0,0.3)',
+                        shadowBlur: 5,
+                        shadowOffsetY: 6,
+                        shadowOffsetX: 0
                     },
                     lineStyle: {
                         color: 'rgb(180,172,222)',
@@ -186,8 +195,11 @@ async function query() {
             for (const [key, value] of Object.entries(data.missing)) {
                 monikers.push(key)
             }
+            if (monikers.length === 0 && title === "Currently Missing:") {
+                title = ""
+            }
             const missingWhen = document.getElementById('missingWhen');
-            missingWhen.innerHTML = title
+            missingWhen.innerHTML = title+'<br/>&nbsp;<br/>&nbsp;'
             const missing = document.getElementById('missing');
             missing.innerHTML = "";
             monikers.sort(function(a, b) {
@@ -221,7 +233,7 @@ async function query() {
                 }).then(event => {
                     event.json().then(upd => {
                         if (upd.hasOwnProperty("missing")) {
-                            setMissing("⏸ Block " + pausedAt + ": ", upd)
+                            setMissing("🛑 Block " + pausedAt + ": ", upd)
                         }
                     });
                 })
@@ -230,7 +242,7 @@ async function query() {
         missingChart.on('globalout', function (){
             if (!updating) {
                 const missingWhen = document.getElementById('missingWhen');
-                missingWhen.innerHTML = "▶️ Block " + pausedAt + ":";
+                missingWhen.innerHTML = "⏲ Block " + pausedAt + ":<br/>&nbsp;<br/>&nbsp;";
                 updating = true;
             }
         })
