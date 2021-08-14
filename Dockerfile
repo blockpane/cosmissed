@@ -10,7 +10,7 @@ RUN go get ./... && go build -ldflags "-s -w" -o cosmissedd cmd/cosmissedd/main.
 FROM debian:10 AS ssl
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt-get -y upgrade && apt-get install -y ca-certificates && \
-    addgroup --gid 26657 --system cosmissed && adduser -uid 26657 --ingroup cosmissed --system --home /var/lib/cosmissed cosmissed
+    addgroup --gid 26656 --system cosmissed && adduser -uid 26656 --ingroup cosmissed --system --home /var/lib/cosmissed cosmissed
 
 # 3rd and final stage, copy the minimum parts into a scratch container, is a smaller and more secure build.
 FROM scratch
