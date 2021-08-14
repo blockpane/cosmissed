@@ -95,7 +95,9 @@ func main() {
 
 	go func() {
 		sig := <-sigs
-		os.Remove(cacheFile)
+		if socket != "" {
+			os.Remove(socket)
+		}
 		l.Println("received", sig, "attempting to save state")
 		f, e := os.OpenFile(cacheFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 		if e != nil {
