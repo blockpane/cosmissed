@@ -248,7 +248,7 @@ async function query() {
                 }).then(event => {
                     event.json().then(upd => {
                         if (upd.hasOwnProperty("missing")) {
-                            setMissing("🛑 Block " + pausedAt + ": ", upd, false)
+                            setMissing("🛑 Missed " + pausedAt + ": ", upd, false)
                         }
                     });
                 })
@@ -257,7 +257,7 @@ async function query() {
         missingChart.on('globalout', function (){
             if (!updating) {
                 const missingWhen = document.getElementById('missingWhen');
-                missingWhen.innerHTML = "⏲ Block " + pausedAt + ":<br/>&nbsp;<br/>&nbsp;";
+                missingWhen.innerHTML = "⏲ Missed " + pausedAt + ":<br/>&nbsp;<br/>&nbsp;";
                 updating = true;
             }
         })
