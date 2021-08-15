@@ -309,7 +309,7 @@ async function query() {
                         setMissing("Currently Missing:", upd, false)
                         setMissing("Jailed (unbonding):", upd, true)
                         locked = false
-                    }, 3000)
+                    }, 1000)
                 } else {
                     pauseOffset += 1;
                 }
