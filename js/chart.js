@@ -120,9 +120,11 @@ async function query() {
                             offset: 0,
                             color: 'rgb(0,0,0)'
                         }, {
+                            offset: 0.5,
+                            color: 'rgb(94,83,173)'
+                        }, {
                             offset: 1,
-                            color: 'rgb(109,91,210)'
-                            //color: 'rgb(89,71,190)'
+                            color: 'rgb(31,27,61)'
                         }]),
                         shadowColor: 'rgb(109,91,210,0.3)',
                         shadowBlur: 4,
@@ -134,7 +136,7 @@ async function query() {
                     name: 'missing consensus %',
                     type: 'line',
                     z: 1,
-                    step: 'end',
+                    smooth: true,
 
                     symbol: 'image://data:image/svg;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjYwMCI+CiAgICA8cGF0aCBmaWxsPSJub25lIiBzdHJva2U9IiNGRkYiIHN0cm9rZS13aWR0aD0iMCIgZD0ibTAsMGg0ODB2MjcwSDB6Ii8+Cjwvc3ZnPg==',
                     symbolSize: [200, 600],
@@ -157,7 +159,6 @@ async function query() {
                     yAxisIndex: 1,
                     symbol: 'image://data:image/svg;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjYwMCI+CiAgICA8cGF0aCBmaWxsPSJub25lIiBzdHJva2U9IiNGRkYiIHN0cm9rZS13aWR0aD0iMCIgZD0ibTAsMGg0ODB2MjcwSDB6Ii8+Cjwvc3ZnPg==',
                     symbolSize: [200, 600],
-                    //symbolOffset: [0, "50%"],
                     showSymbol: false,
                     hoverAnimation: false,
                     data: data.took,
@@ -190,17 +191,31 @@ async function query() {
             option.dataZoom[0].end = e.end;
         });
 
-        const setMissing = function (title, data){
+        const setMissing = function (title, data, jailed){
             let monikers = [];
-            for (const [key, value] of Object.entries(data.missing)) {
-                monikers.push(key)
+            let titleId = "missingWhen";
+            let listId = "missing"
+            if (jailed) {
+                titleId = "currentJailed"
+                listId = "jailed"
             }
-            if (monikers.length === 0 && title === "Currently Missing:") {
+            let missingData
+            if (jailed) {
+                missingData = data.jailed_unbonding;
+            } else {
+                missingData = data.missing
+            }
+            if (typeof(missingData) != "undefined") {
+                for (const [key, value] of Object.entries(missingData)) {
+                    monikers.push(key)
+                }
+            }
+            if (monikers.length === 0 && (title === "Currently Missing:" || title === "Jailed (unbonding):")) {
                 title = ""
             }
-            const missingWhen = document.getElementById('missingWhen');
+            const missingWhen = document.getElementById(titleId);
             missingWhen.innerHTML = title+'<br/>&nbsp;<br/>&nbsp;'
-            const missing = document.getElementById('missing');
+            const missing = document.getElementById(listId);
             missing.innerHTML = "";
             monikers.sort(function(a, b) {
                 const nameA = a.toUpperCase();
@@ -233,7 +248,7 @@ async function query() {
                 }).then(event => {
                     event.json().then(upd => {
                         if (upd.hasOwnProperty("missing")) {
-                            setMissing("🛑 Block " + pausedAt + ": ", upd)
+                            setMissing("🛑 Block " + pausedAt + ": ", upd, false)
                         }
                     });
                 })
@@ -291,7 +306,8 @@ async function query() {
                             return
                         }
                         pauseOffset = 0;
-                        setMissing("Currently Missing:", upd)
+                        setMissing("Currently Missing:", upd, false)
+                        setMissing("Jailed (unbonding):", upd, true)
                         locked = false
                     }, 3000)
                 } else {
@@ -302,9 +318,10 @@ async function query() {
             });
             tableSocket.onclose = function(e) {
                 console.log('Socket is closed, retrying /missed/ws ...', e.reason);
-                setMissing("⚠️ Not Connected", {missing:{"error": ""}})
+                setMissing("⚠ Not Connected", {missing:{"error": ""}}, true)
+                setMissing("⚠ Not Connected", {missing:{"error": ""}}, false)
                 document.getElementById('headblock').innerHTML = "unknown";
-                document.getElementById('seconds').innerHTML = " ⚠️ ";
+                document.getElementById('seconds').innerHTML = "⚠ ";
                 setTimeout(function() {
                     connectMissed();
                 }, 4000);

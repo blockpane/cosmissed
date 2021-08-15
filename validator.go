@@ -63,24 +63,31 @@ type HistValidatorsResp struct {
 	Hist struct {
 		Validators []Validator `json:"valset"`
 	} `json:"hist"`
+	Validators []Validator `json:"validators"`
 }
 
-func ParseValidatorsResp(body []byte) ([]Validator, error) {
+func ParseValidatorsResp(body []byte, history bool) ([]Validator, error) {
 	var (
 		err      error
 		response = HistValidatorsResp{}
 		raw      = make(map[string]interface{})
+		valset   = "valset"
 	)
+	if !history {
+		valset = "validators"
+	}
 	err = json.Unmarshal(body, &raw)
 	if err != nil {
 		return nil, err
 	}
-	if raw["hist"] == nil {
-		return nil, errors.New("not a valid HistValidatorsResp structure")
+	if raw["hist"] == nil && raw["validators"] == nil {
+		return nil, errors.New("not a valid HistValidatorsResp or Validators structure")
 	}
 	var bi bool
-	if raw, bi = raw["hist"].(map[string]interface{}); !bi {
-		return nil, errors.New("no hist in validators response")
+	if history {
+		if raw, bi = raw["hist"].(map[string]interface{}); !bi {
+			return nil, errors.New("no hist in validators response")
+		}
 	}
 	response.Hist.Validators = make([]Validator, 0)
 
@@ -110,11 +117,11 @@ func ParseValidatorsResp(body []byte) ([]Validator, error) {
 		return ""
 	}
 
-	if _, ok := raw["valset"].([]interface{}); !ok {
+	if _, ok := raw[valset].([]interface{}); !ok {
 		return nil, errors.New("no validators found")
 	}
 
-	for _, val := range raw["valset"].([]interface{}) {
+	for _, val := range raw[valset].([]interface{}) {
 		validator := Validator{}
 		if _, ok := val.(map[string]interface{}); !ok {
 			continue

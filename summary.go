@@ -27,15 +27,17 @@ type Summary struct {
 	Proposer          string            `json:"proposer"`
 	VotePower         uint64            `json:"vote_power"`
 	VoteMissing       uint64            `json:"vote_missing"`
+	JailedUnbonding   map[string]string `json:"jailed_unbonding"`
 }
 
-func summarize(blocknum int, ts int64, proposer string, signers []string, addrs map[string]bool, valcons map[string]string, validators []Validator) *Summary {
+func summarize(blocknum int, ts int64, proposer string, signers []string, addrs map[string]bool, valcons map[string]string, validators, jailed []Validator, includeJailed bool) *Summary {
 	s := Summary{
 		BlockNum:          blocknum,
 		Timestamp:         ts,
 		Missed:            len(addrs) - len(signers),
 		MissingValidators: make(map[string]string),
 		PresentValidators: make(map[string]string),
+		JailedUnbonding:   make(map[string]string),
 	}
 	names := make(map[string]string)
 	powers := make(map[string]uint64)
@@ -43,6 +45,14 @@ func summarize(blocknum int, ts int64, proposer string, signers []string, addrs 
 		names[v.ValidatorAddress] = bm.Sanitize(v.Description.Moniker)
 		powers[v.ValidatorAddress] = v.Tokens
 		s.VotePower += v.Tokens
+	}
+	if includeJailed {
+		for _, v := range jailed {
+			if v.Jailed == false {
+				continue
+			}
+			s.JailedUnbonding[bm.Sanitize(v.Description.Moniker)] = "" // FIXME: get valoper for lookups.
+		}
 	}
 	s.Proposer = names[proposer]
 	for i := range signers {

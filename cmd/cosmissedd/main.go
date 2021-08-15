@@ -105,7 +105,7 @@ func main() {
 		}
 		defer f.Close()
 		out := gob.NewEncoder(f)
-		e = out.Encode(&savedState{
+		ss := &savedState{
 			CachedResult: cachedResult,
 			CachedTop:    cachedTop,
 			CachedChart:  cachedChart,
@@ -113,7 +113,8 @@ func main() {
 			BlockError:   blockError,
 			Results:      results,
 			Successful:   successful,
-		})
+		}
+		e = out.Encode(ss)
 		if e != nil {
 			l.Fatal(e)
 		}
@@ -196,7 +197,11 @@ func main() {
 	logmod := 100
 	refresh := func() {
 		for i := successful + 1; i < current; i++ {
-			summary, e := missed.FetchSummary(i)
+			catchingUp := false
+			if i < current-1 {
+				catchingUp = true
+			}
+			summary, e := missed.FetchSummary(i, catchingUp)
 			if e != nil {
 				_ = l.Output(2, e.Error())
 				return
@@ -356,7 +361,7 @@ func main() {
 				return
 			}
 			var s *missed.Summary
-			s, err = missed.FetchSummary(int(block))
+			s, err = missed.FetchSummary(int(block), true)
 			if err != nil {
 				writer.WriteHeader(http.StatusInternalServerError)
 				_, _ = writer.Write(blockError)

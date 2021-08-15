@@ -14,6 +14,7 @@ const (
 	commitPath        = `/commit?height=`
 	validatorsetsPath = `/validatorsets/`
 	historicalPath    = `/cosmos/staking/v1beta1/historical_info/`
+	unbondingPath     = `/cosmos/staking/v1beta1/validators?status=BOND_STATUS_UNBONDING`
 	timeout           = 2 * time.Second
 )
 
@@ -61,7 +62,14 @@ func CurrentHeight() (curHeight int, networkName string, err error) {
 func fetch(height int, client *http.Client, baseUrl, path string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", baseUrl+path+strconv.Itoa(height), nil)
+	var req *http.Request
+	var err error
+	switch height {
+	case 0:
+		req, err = http.NewRequestWithContext(ctx, "GET", baseUrl+path, nil)
+	default:
+		req, err = http.NewRequestWithContext(ctx, "GET", baseUrl+path+strconv.Itoa(height), nil)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +81,7 @@ func fetch(height int, client *http.Client, baseUrl, path string) ([]byte, error
 	return io.ReadAll(resp.Body)
 }
 
-func FetchSummary(height int) (*Summary, error) {
+func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 	m := minSignatures{}
 	b, err := fetch(height, TClient, TUrl, commitPath)
 	if err != nil {
@@ -81,6 +89,7 @@ func FetchSummary(height int) (*Summary, error) {
 	}
 	err = json.Unmarshal(b, &m)
 	proposer, ts, signers := m.parse()
+
 	v := minValidatorSet{}
 	b, err = fetch(height, CClient, CUrl, validatorsetsPath)
 	if err != nil {
@@ -91,13 +100,23 @@ func FetchSummary(height int) (*Summary, error) {
 		return nil, err
 	}
 	addrs, cons := v.parse()
+
+	b, err = fetch(0, CClient, CUrl, unbondingPath)
+	if err != nil {
+		return nil, err
+	}
+	jailed, err := ParseValidatorsResp(b, false)
+	if err != nil {
+		return nil, err
+	}
+
 	b, err = fetch(height, CClient, CUrl, historicalPath)
 	if err != nil {
 		return nil, err
 	}
-	vals, err := ParseValidatorsResp(b)
+	vals, err := ParseValidatorsResp(b, true)
 	if err != nil {
 		return nil, err
 	}
-	return summarize(height, ts, proposer, signers, addrs, cons, vals), nil
+	return summarize(height, ts, proposer, signers, addrs, cons, vals, jailed, !catchingUp), nil
 }
