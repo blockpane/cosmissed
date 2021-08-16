@@ -36,9 +36,9 @@ func main() {
 	l := log.New(os.Stderr, "cosmissed | ", log.Lshortfile|log.LstdFlags)
 
 	var (
-		current, successful, track, listen                    int
+		current, successful, track, listen                               int
 		cosmosApi, tendermintApi, prefix, networkName, socket, cacheFile string
-		ready, stdout                                         bool
+		ready, stdout                                                    bool
 	)
 
 	flag.StringVar(&cosmosApi, "c", "http://127.0.0.1:1317", "cosmos http API endpoint")
@@ -87,6 +87,7 @@ func main() {
 	cachedTop := []byte("not ready")
 	cachedChart := []byte("not ready")
 	cachedParams := []byte("not ready")
+	cachedMap := []byte("[]")
 	blockError := []byte(`{"missing":{"fetch error":""}}`)
 	var results []*missed.Summary
 
@@ -121,9 +122,13 @@ func main() {
 		l.Fatal("exiting")
 	}()
 
-	var bcastMissed, bcastTop, bcastChart broadcast.Broadcaster
-	defer bcastMissed.Discard()
-	defer bcastTop.Discard()
+	var bcastMissed, bcastTop, bcastChart, bcastMap broadcast.Broadcaster
+	defer func() {
+		bcastMissed.Discard()
+		bcastTop.Discard()
+		bcastTop.Discard()
+		bcastMap.Discard()
+	}()
 
 	top := func() {
 		t, err := missed.TopMissed(results, track, prefix)
@@ -280,63 +285,39 @@ func main() {
 
 	var upgrader = websocket.Upgrader{}
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
-	http.HandleFunc("/missed/ws", func(writer http.ResponseWriter, request *http.Request) {
+
+	broadcaster := func(writer http.ResponseWriter, request *http.Request, b *broadcast.Broadcaster){
 		c, err := upgrader.Upgrade(writer, request, nil)
 		if err != nil {
 			l.Print("upgrade:", err)
 			return
 		}
 		defer c.Close()
-		sub := bcastMissed.Listen()
+		sub := b.Listen()
 		defer sub.Discard()
-		for b := range sub.Channel() {
-			if e := c.WriteMessage(websocket.TextMessage, b.([]byte)); e != nil {
+		for message := range sub.Channel() {
+			if e := c.WriteMessage(websocket.TextMessage, message.([]byte)); e != nil {
 				l.Println(request.RemoteAddr, e)
 				return
 			}
 		}
-	})
+	}
 
-	http.HandleFunc("/top/ws", func(writer http.ResponseWriter, request *http.Request) {
-		c, err := upgrader.Upgrade(writer, request, nil)
-		if err != nil {
-			l.Print("upgrade:", err)
-			return
-		}
-		defer c.Close()
-		sub := bcastTop.Listen()
-		defer sub.Discard()
-		for b := range sub.Channel() {
-			if e := c.WriteMessage(websocket.TextMessage, b.([]byte)); e != nil {
-				l.Println(request.RemoteAddr, e)
-				return
-			}
-		}
-	})
-
-	http.HandleFunc("/chart/ws", func(writer http.ResponseWriter, request *http.Request) {
-		c, err := upgrader.Upgrade(writer, request, nil)
-		if err != nil {
-			l.Print("upgrade:", err)
-			return
-		}
-		defer c.Close()
-		sub := bcastChart.Listen()
-		defer sub.Discard()
-		for b := range sub.Channel() {
-			if e := c.WriteMessage(websocket.TextMessage, b.([]byte)); e != nil {
-				l.Println(request.RemoteAddr, e)
-				return
-			}
-		}
-	})
-
-	http.Handle("/js/", http.FileServer(http.FS(missed.Js)))
-	http.Handle("/img/", http.FileServer(http.FS(missed.Js)))
-	http.Handle("/css/", http.FileServer(http.FS(missed.Js)))
+	// Something very strange going on with http.FS ... if using switch below does not send mime types?
+	http.Handle("/js/", http.FileServer(http.FS(missed.StaticContent)))
+	http.Handle("/img/", http.FileServer(http.FS(missed.StaticContent)))
+	http.Handle("/css/", http.FileServer(http.FS(missed.StaticContent)))
 
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
+		case "/missed/ws":
+			broadcaster(writer, request, &bcastMissed)
+		case "/top/ws":
+			broadcaster(writer, request, &bcastTop)
+		case "/chart/ws":
+			broadcaster(writer, request, &bcastChart)
+		case "/map/ws":
+			broadcaster(writer, request, &bcastMap)
 		case "/chart":
 			setJsonHeader(writer)
 			_, _ = writer.Write(cachedChart)
@@ -349,6 +330,9 @@ func main() {
 		case "/params":
 			setJsonHeader(writer)
 			_, _ = writer.Write(cachedParams)
+		case "/map":
+			setJsonHeader(writer)
+			_, _ = writer.Write(cachedMap)
 		case "/block":
 			params := request.URL.Query()
 			if params["num"] == nil || len(params["num"]) != 1 {
@@ -376,6 +360,11 @@ func main() {
 			}
 			setJsonHeader(writer)
 			_, _ = writer.Write(j)
+		case "/network.html":
+			writer.Header().Set("Server", "cosmissed")
+			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+			// todo appropriate security headers.
+			_, _ = writer.Write(missed.NetHtml)
 		case "/", "/index.html":
 			writer.Header().Set("Server", "cosmissed")
 			writer.Header().Set("Content-Type", "text/html; charset=utf-8")

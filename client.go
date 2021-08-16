@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -119,4 +120,50 @@ func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 		return nil, err
 	}
 	return summarize(height, ts, proposer, signers, addrs, cons, vals, jailed, !catchingUp), nil
+}
+
+// getNeighbors calls the RCP endpoint asking for neighbors.
+func getNeighbors(node string) (source string, peers map[string]string, e error) {
+	if GeoDb == nil {
+		return "", nil, errors.New("no geoip database is loaded, skipping peer discovery")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	// TODO: for now the node variable isn't used, but will be adding the ability to poll more nodes soon,
+	// including trying our discovered peer's RPC. Need to investigate how difficult it would be to use
+	// native pex instead of API.
+	endpoint := TUrl
+	if node != "" {
+		endpoint = node
+		if !strings.HasPrefix(endpoint, `http`) {
+			endpoint = `http://` + endpoint
+		}
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint+`/net_info`, nil)
+	if err != nil {
+		return "", nil, err
+	}
+	resp, err := TClient.Do(req)
+	if err != nil {
+		return "", nil, err
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", nil, err
+	}
+	defer resp.Body.Close()
+	ni := &netInfoResp{}
+	err = json.Unmarshal(body, ni)
+	if err != nil {
+		return "", nil, err
+	}
+	listenerIp, err := ni.getListenerIp()
+	if err != nil {
+		return "", nil, err
+	}
+	result := make(map[string]string)
+	for i := range ni.Result.Peers {
+		result[ni.Result.Peers[i].RemoteIp] = ni.Result.Peers[i].NodeInfo.Moniker
+	}
+	return listenerIp, result, nil
 }

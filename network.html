@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monitor</title>
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+  <script src="js/echarts.min.js"></script>
+  <script src="js/echarts-gl.min.js"></script>
+  <link rel="icon" href="/img/favicon.png">
+</head>
+<body onload="showGlobe()">
+<div class="container-xl" style=" padding-top: 20px;">
+  <div class="row rounded-3 shadow-lg" id="globe" style="background: #000; height: 800px; padding-bottom: 30px;"></div>
+  <div class="row" style="padding-top: 30px;">
+    <p align="center">
+      <a href="https://blockpane.com"><img src="img/bp-logo-text.svg" height="30" alt="© 2021 Block Pane LLC."></a>&nbsp;
+      <a href="https://github.com/blockpane/cosmissed"><img src="img/GitHub-Mark.png" height="30"></a>
+    </p>
+  </div>
+</div>
+<script src="js/globe.js"></script>
+<script type="text/javascript">
+    function showGlobe(){
+        getGeo();
+    }
+</script>
+
+<script src="js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
