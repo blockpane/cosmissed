@@ -10,8 +10,13 @@ import (
 type MinNeighbor struct {
 	RemoteIp string `json:"remote_ip"`
 	NodeInfo struct {
-		IsOutbound bool `json:"is_outbound"`
-		Moniker string `json:"moniker"`
+		IsOutbound bool   `json:"is_outbound"`
+		Moniker    string `json:"moniker"`
+		Other      struct {
+			// tendermint RPC API we will try to connect and get more peers (future feature)
+			// if not listening on 127.0.0.1 or unix://
+			RpcAddress string `json:"rpc_address"`
+		} `json:"other"`
 	} `json:"node_info"`
 }
 

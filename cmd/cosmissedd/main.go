@@ -286,7 +286,7 @@ func main() {
 	var upgrader = websocket.Upgrader{}
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 
-	broadcaster := func(writer http.ResponseWriter, request *http.Request, b *broadcast.Broadcaster){
+	broadcaster := func(writer http.ResponseWriter, request *http.Request, b *broadcast.Broadcaster) {
 		c, err := upgrader.Upgrade(writer, request, nil)
 		if err != nil {
 			l.Print("upgrade:", err)
