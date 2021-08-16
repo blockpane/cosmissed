@@ -125,8 +125,10 @@ func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 // TODO: build the peermap and return json to send to clients
 
 func FetchPeers() (j []byte, err error){
-	j = []byte("[]")
-	return j, nil
+	// FIXME: mock data
+
+	// randomly update to test websocket
+	return mkPex(), nil
 }
 
 // getNeighbors calls the RCP endpoint asking for neighbors.

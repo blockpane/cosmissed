@@ -93,9 +93,14 @@ func main() {
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	closeDb := make(chan interface{})
 
 	go func() {
 		sig := <-sigs
+		if missed.GeoDb != nil {
+			// prevent race using channel to close
+			close(closeDb)
+		}
 		if socket != "" {
 			os.Remove(socket)
 		}
@@ -131,23 +136,29 @@ func main() {
 	}()
 
 	go func() {
+		fp := func() {
+			j, e := missed.FetchPeers()
+			if e != nil {
+				l.Println(e)
+				return
+			}
+			if j != nil {
+				// TODO: ensure it really has changed, this may be a lot of data.
+				cachedMap = j
+				e = bcastMap.Send(cachedMap)
+				if e != nil {
+					l.Println(e)
+				}
+			}
+		}
+		fp()
 		tick := time.NewTicker(time.Minute)
 		for {
 			select {
 			case <-tick.C:
-				j, e := missed.FetchPeers()
-				if e != nil {
-					l.Println(e)
-					continue
-				}
-				if j != nil {
-					// TODO: ensure it really has changed, this may be a lot of data.
-					cachedMap = j
-					e = bcastMap.Send(cachedMap)
-					if e != nil {
-						l.Println(e)
-					}
-				}
+				fp()
+			case <-closeDb:
+				_ = missed.GeoDb.Close()
 			}
 		}
 	}()
