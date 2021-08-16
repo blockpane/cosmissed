@@ -3,8 +3,24 @@ package missed
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 )
+
+func getLatLong(ipAddr string) (float64, float64, error) {
+	if GeoDb == nil {
+		return 0,0, errors.New("geolight db not loaded")
+	}
+	ip := net.ParseIP(ipAddr)
+	if ip.String() != ipAddr || isPrivate(ip) {
+		return 0, 0, fmt.Errorf("ip %s is invalid for geo lookup", ipAddr)
+	}
+	record, err := GeoDb.City(ip)
+	if err != nil {
+		return 0, 0, err
+	}
+	return record.Location.Latitude, record.Location.Longitude, err
+}
 
 type PeerSet struct {
 	Host        string `json:"host"`
