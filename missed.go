@@ -7,6 +7,7 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"os"
 )
 
 //go:embed index.html
@@ -23,9 +24,11 @@ var (
 	TClient, CClient *http.Client
 	TUrl, CUrl       string
 	GeoDb            *geoip2.Reader
+	l                *log.Logger
 )
 
 func init() {
+	l = log.New(os.Stderr, "cosmissed | ", log.Lshortfile|log.LstdFlags)
 	_ = mime.AddExtensionType(".html", "text/html; charset=UTF-8")
 	_ = mime.AddExtensionType(".js", "application/javascript")
 	_ = mime.AddExtensionType(".css", "text/css")
@@ -34,6 +37,6 @@ func init() {
 	//FIXME: set flag for file location
 	GeoDb, err = geoip2.Open("GeoLite2-City.mmdb")
 	if err != nil {
-		log.Println("error opening GeoLite2-City.mmdb, geoip features disabled:", err.Error())
+		l.Println("error opening GeoLite2-City.mmdb, geoip features disabled:", err.Error())
 	}
 }

@@ -130,6 +130,28 @@ func main() {
 		bcastMap.Discard()
 	}()
 
+	go func() {
+		tick := time.NewTicker(time.Minute)
+		for {
+			select {
+			case <-tick.C:
+				j, e := missed.FetchPeers()
+				if e != nil {
+					l.Println(e)
+					continue
+				}
+				if j != nil {
+					// TODO: ensure it really has changed, this may be a lot of data.
+					cachedMap = j
+					e = bcastMap.Send(cachedMap)
+					if e != nil {
+						l.Println(e)
+					}
+				}
+			}
+		}
+	}()
+
 	top := func() {
 		t, err := missed.TopMissed(results, track, prefix)
 		if err != nil {

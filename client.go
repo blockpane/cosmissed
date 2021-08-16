@@ -122,7 +122,16 @@ func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 	return summarize(height, ts, proposer, signers, addrs, cons, vals, jailed, !catchingUp), nil
 }
 
+// TODO: build the peermap and return json to send to clients
+
+func FetchPeers() (j []byte, err error){
+	j = []byte("[]")
+	return j, nil
+}
+
 // getNeighbors calls the RCP endpoint asking for neighbors.
+// TODO: the peers map isn't used here anymore ... consider changing it to a slice of id@host:port
+//       that can be used in config.toml
 func getNeighbors(node string) (source string, peers map[string]string, e error) {
 	if GeoDb == nil {
 		return "", nil, errors.New("no geoip database is loaded, skipping peer discovery")
@@ -165,5 +174,8 @@ func getNeighbors(node string) (source string, peers map[string]string, e error)
 	for i := range ni.Result.Peers {
 		result[ni.Result.Peers[i].RemoteIp] = ni.Result.Peers[i].NodeInfo.Moniker
 	}
+
+	// TODO: get (and cache) geo points and also return a `PeerSet` to be appended to the PeerMap
+
 	return listenerIp, result, nil
 }

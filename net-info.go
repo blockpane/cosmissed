@@ -38,7 +38,7 @@ func (nif netInfoResp) getListenerIp() (string, error) {
 		// got a DNS name
 		ips, err := net.LookupIP(host)
 		if err != nil || len(ips) == 0 {
-			return "", fmt.Errorf("could not get ips for %s: %s", host, err.Error())
+			return "", fmt.Errorf("could not get ips for %s: %v", host, err)
 		}
 		host = ips[0].String()
 	}

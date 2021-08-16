@@ -3,7 +3,6 @@ package missed
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net"
 )
 
@@ -24,7 +23,7 @@ func (pm PeerMap) ToLinesJson() ([]byte, error) {
 	for _, peer := range pm {
 		lines, err := peer.toLines3d()
 		if err != nil {
-			log.Println(err)
+			l.Println(err)
 			continue
 		}
 		allLines = append(allLines, lines...)
