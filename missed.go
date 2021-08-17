@@ -25,6 +25,7 @@ var (
 	TUrl, CUrl       string
 	GeoDb            *geoip2.Reader
 	l                *log.Logger
+	peerMap          PeerMap
 )
 
 func init() {
@@ -39,4 +40,7 @@ func init() {
 	if err != nil {
 		l.Println("error opening GeoLite2-City.mmdb, geoip features disabled:", err.Error())
 	}
+
+	peerMap = make([]PeerSet, 0)
+
 }

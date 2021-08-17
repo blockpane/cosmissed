@@ -28,11 +28,11 @@ type netInfoResp struct {
 }
 
 func (nif netInfoResp) getListenerIp() (string, error) {
-	l := strings.Split(nif.Result.Listeners[0], `//`)
-	if len(l) != 1 {
+	list := strings.Split(nif.Result.Listeners[0], `//`)
+	if len(list) != 2 {
 		return "", fmt.Errorf(`could not parse %+v into hostname`, nif.Result.Listeners)
 	}
-	host := strings.Split(l[1], `:`)[0]
+	host := strings.Split(list[1], `:`)[0]
 	ipAddr := net.ParseIP(host)
 	if ipAddr.String() != host {
 		// got a DNS name

@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -126,31 +125,30 @@ func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 
 func FetchPeers() (j []byte, err error){
 	// FIXME: mock data
-
 	// randomly update to test websocket
-	return mkPex(), nil
+	//return mkPex(), nil
+	_, pm, err := getNeighbors(nil)
+	if err != nil {
+		return nil, err
+	}
+	return pm.ToLinesJson()
 }
+
+var cachedPoints = make(map[string]point)
 
 // getNeighbors calls the RCP endpoint asking for neighbors.
 // TODO: the peers map isn't used here anymore ... consider changing it to a slice of id@host:port
 //       that can be used in config.toml
-func getNeighbors(node string) (source string, peers map[string]string, e error) {
+func getNeighbors(nodes []string) (source string, peers PeerMap, e error) {
 	if GeoDb == nil {
 		return "", nil, errors.New("no geoip database is loaded, skipping peer discovery")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	// TODO: for now the node variable isn't used, but will be adding the ability to poll more nodes soon,
+	// TODO: for now the nodes variable isn't used, but will be adding the ability to poll more nodes soon,
 	// including trying our discovered peer's RPC. Need to investigate how difficult it would be to use
 	// native pex instead of API.
-	endpoint := TUrl
-	if node != "" {
-		endpoint = node
-		if !strings.HasPrefix(endpoint, `http`) {
-			endpoint = `http://` + endpoint
-		}
-	}
-	req, err := http.NewRequestWithContext(ctx, "GET", endpoint+`/net_info`, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", TUrl+`/net_info`, nil)
 	if err != nil {
 		return "", nil, err
 	}
@@ -172,12 +170,40 @@ func getNeighbors(node string) (source string, peers map[string]string, e error)
 	if err != nil {
 		return "", nil, err
 	}
-	result := make(map[string]string)
-	for i := range ni.Result.Peers {
-		result[ni.Result.Peers[i].RemoteIp] = ni.Result.Peers[i].NodeInfo.Moniker
+
+	var lat, long float32
+	LongLat := cachedPoints[listenerIp]
+	if LongLat[0] == 0 {
+		long, lat, e = getLatLong(listenerIp)
+		if e != nil {
+			return "", nil, e
+		}
+		LongLat = point{lat, long}
+		cachedPoints[listenerIp] = LongLat
 	}
 
-	// TODO: get (and cache) geo points and also return a `PeerSet` to be appended to the PeerMap
+	result := PeerSet{
+		Host:        listenerIp,
+		Coordinates: LongLat,
+		Peers:       make([]Peer, 0),
+	}
+	for _, p := range ni.Result.Peers {
+		ll := cachedPoints[p.RemoteIp]
+		if ll[0] == 0 {
+			long, lat, e = getLatLong(p.RemoteIp)
+			if e != nil {
+				l.Println(e)
+				continue
+			}
+			LongLat = point{lat, long}
+			cachedPoints[p.RemoteIp] = LongLat
+		}
+		result.Peers = append(result.Peers, Peer{
+			Host:        p.RemoteIp,
+			Coordinates: ll,
+			Outbound:    p.NodeInfo.IsOutbound,
+		})
+	}
 
-	return listenerIp, result, nil
+	return listenerIp, PeerMap{result}, nil
 }

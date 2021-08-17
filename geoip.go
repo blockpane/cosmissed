@@ -7,7 +7,7 @@ import (
 	"net"
 )
 
-func getLatLong(ipAddr string) (float64, float64, error) {
+func getLatLong(ipAddr string) (float32, float32, error) {
 	if GeoDb == nil {
 		return 0,0, errors.New("geolight db not loaded")
 	}
@@ -19,17 +19,19 @@ func getLatLong(ipAddr string) (float64, float64, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	return record.Location.Latitude, record.Location.Longitude, err
+	return float32(record.Location.Latitude), float32(record.Location.Longitude), err
 }
 
 type PeerSet struct {
 	Host        string `json:"host"`
 	Coordinates point  `json:"coordinates"`
-	Peers       []struct {
-		Host        string `json:"host"`
-		Coordinates point  `json:"coordinates"`
-		Outbound    bool   `json:"incoming"`
-	} `json:"peers"`
+	Peers       []Peer `json:"peers"`
+}
+
+type Peer struct {
+	Host        string `json:"host"`
+	Coordinates point  `json:"coordinates"`
+	Outbound    bool   `json:"incoming"`
 }
 
 type PeerMap []PeerSet

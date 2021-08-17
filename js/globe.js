@@ -69,7 +69,7 @@ async function getGeo() {
                 globeChart.setOption(option);
             });
             socket.onclose = function(e) {
-                console.log('Socket is closed, retrying /chart/ws ...', e.reason);
+                console.log('Socket is closed, retrying /map/ws ...', e.reason);
                 setTimeout(function() {
                     connectGlobe();
                 }, 4000);
