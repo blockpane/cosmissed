@@ -121,7 +121,7 @@ func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 	return summarize(height, ts, proposer, signers, addrs, cons, vals, jailed, !catchingUp), nil
 }
 
-func FetchPeers(xtra []string) (j []byte, err error){
+func FetchPeers(xtra []string) (j []byte, err error) {
 	_, pm, err := getNeighbors("")
 	if err != nil {
 		return nil, err

@@ -165,8 +165,9 @@ func main() {
 				}
 			}
 		}
+		time.Sleep(10 * time.Second)
 		fp()
-		tick := time.NewTicker(time.Minute)
+		tick := time.NewTicker(30 * time.Second)
 		for {
 			select {
 			case <-tick.C:

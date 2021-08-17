@@ -9,7 +9,7 @@ import (
 
 func getLatLong(ipAddr string) (float32, float32, error) {
 	if GeoDb == nil {
-		return 0,0, errors.New("geolight db not loaded")
+		return 0, 0, errors.New("geolight db not loaded")
 	}
 	ip := net.ParseIP(ipAddr)
 	if ip.String() != ipAddr || isPrivate(ip) {

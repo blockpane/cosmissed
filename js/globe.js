@@ -40,16 +40,16 @@ async function getGeo() {
                 coordinateSystem: 'globe',
                 blendMode: 'lighter',
                 lineStyle: {
-                    width: 1,
+                    width: 2,
                     color: 'rgb(90, 45, 0)',
                     opacity: 0.4
                 },
                 effect: {
                     show: true,
-                    trailWidth: 4,
-                    trailOpacity: 0.3,
-                    trailLength: 0.4,
-                    constantSpeed: 100
+                    trailWidth: 2,
+                    trailOpacity: 0.4,
+                    trailLength: 0.2,
+                    constantSpeed: 80
                 },
                 data: pex
             }
