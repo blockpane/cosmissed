@@ -12,6 +12,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -36,9 +37,9 @@ func main() {
 	l := log.New(os.Stderr, "cosmissed | ", log.Lshortfile|log.LstdFlags)
 
 	var (
-		current, successful, track, listen                               int
-		cosmosApi, tendermintApi, prefix, networkName, socket, cacheFile string
-		ready, stdout                                                    bool
+		current, successful, track, listen                                          int
+		cosmosApi, tendermintApi, prefix, networkName, socket, cacheFile, xRpcHosts string
+		ready, stdout                                                               bool
 	)
 
 	flag.StringVar(&cosmosApi, "c", "http://127.0.0.1:1317", "cosmos http API endpoint")
@@ -46,6 +47,7 @@ func main() {
 	flag.StringVar(&prefix, "p", "cosmos", "address prefix, ex- cosmos = cosmosvaloper, cosmosvalcons ...")
 	flag.StringVar(&socket, "socket", "", "filename for unix socket to listen on, if set will disable TCP listener")
 	flag.StringVar(&cacheFile, "cache", "cosmissed.dat", "filename for caching previous blocks")
+	flag.StringVar(&xRpcHosts, "extra-rpc", "", "extra tendermint RPC endpoints to poll for peer info, comma seperated list of URLs")
 	flag.IntVar(&listen, "l", 8080, "webserver port to listen on")
 	flag.IntVar(&track, "n", 3000, "most recent blocks to track")
 	flag.BoolVar(&stdout, "v", false, "log new records to stdout (error logs already on stderr)")
@@ -135,9 +137,21 @@ func main() {
 		bcastMap.Discard()
 	}()
 
+	// Additional tendermint RPC endpoints to poll for net_info
+	xtraHosts := make([]string, 0)
+	if xRpcHosts != "" {
+		split := strings.Split(xRpcHosts, ",")
+		for i := range split {
+			if _, e := url.Parse(strings.Trim(split[i], " ")); e != nil {
+				l.Fatalf(`invalid -extra-rpc value: %s, is not a URL.`, split[i])
+			}
+			xtraHosts = append(xtraHosts, split[i])
+		}
+	}
+
 	go func() {
 		fp := func() {
-			j, e := missed.FetchPeers()
+			j, e := missed.FetchPeers(xtraHosts)
 			if e != nil {
 				l.Println(e)
 				return

@@ -121,54 +121,61 @@ func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 	return summarize(height, ts, proposer, signers, addrs, cons, vals, jailed, !catchingUp), nil
 }
 
-// TODO: build the peermap and return json to send to clients
-
-func FetchPeers() (j []byte, err error){
-	// FIXME: mock data
-	// randomly update to test websocket
-	//return mkPex(), nil
-	_, pm, err := getNeighbors(nil)
+func FetchPeers(xtra []string) (j []byte, err error){
+	_, pm, err := getNeighbors("")
 	if err != nil {
 		return nil, err
 	}
-	return pm.ToLinesJson()
+	m := PeerMap{pm}
+	for _, s := range xtra {
+		_, pm, err = getNeighbors(s)
+		if err != nil {
+			l.Println(err)
+			continue
+		}
+		m = append(m, pm)
+	}
+	// TODO: recurse (and cache) list of peers with RPC exposed.
+	return m.ToLinesJson()
 }
 
 var cachedPoints = make(map[string]point)
 
 // getNeighbors calls the RCP endpoint asking for neighbors.
-// TODO: the peers map isn't used here anymore ... consider changing it to a slice of id@host:port
-//       that can be used in config.toml
-func getNeighbors(nodes []string) (source string, peers PeerMap, e error) {
+func getNeighbors(node string) (source string, peers PeerSet, e error) {
+	empty := PeerSet{}
 	if GeoDb == nil {
-		return "", nil, errors.New("no geoip database is loaded, skipping peer discovery")
+		return "", empty, errors.New("no geoip database is loaded, skipping peer discovery")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	// TODO: for now the nodes variable isn't used, but will be adding the ability to poll more nodes soon,
-	// including trying our discovered peer's RPC. Need to investigate how difficult it would be to use
-	// native pex instead of API.
-	req, err := http.NewRequestWithContext(ctx, "GET", TUrl+`/net_info`, nil)
-	if err != nil {
-		return "", nil, err
+	var client = TClient
+	var url = TUrl
+	if node != "" {
+		client = http.DefaultClient
+		url = node
 	}
-	resp, err := TClient.Do(req)
+	req, err := http.NewRequestWithContext(ctx, "GET", url+`/net_info`, nil)
 	if err != nil {
-		return "", nil, err
+		return "", empty, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", empty, err
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", nil, err
+		return "", empty, err
 	}
 	defer resp.Body.Close()
 	ni := &netInfoResp{}
 	err = json.Unmarshal(body, ni)
 	if err != nil {
-		return "", nil, err
+		return "", empty, err
 	}
 	listenerIp, err := ni.getListenerIp()
 	if err != nil {
-		return "", nil, err
+		return "", empty, err
 	}
 
 	var lat, long float32
@@ -176,7 +183,7 @@ func getNeighbors(nodes []string) (source string, peers PeerMap, e error) {
 	if LongLat[0] == 0 {
 		long, lat, e = getLatLong(listenerIp)
 		if e != nil {
-			return "", nil, e
+			return "", empty, e
 		}
 		LongLat = point{lat, long}
 		cachedPoints[listenerIp] = LongLat
@@ -205,5 +212,5 @@ func getNeighbors(nodes []string) (source string, peers PeerMap, e error) {
 		})
 	}
 
-	return listenerIp, PeerMap{result}, nil
+	return listenerIp, result, nil
 }

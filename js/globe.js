@@ -40,9 +40,9 @@ async function getGeo() {
                 coordinateSystem: 'globe',
                 blendMode: 'lighter',
                 lineStyle: {
-                    width: 3,
+                    width: 1,
                     color: 'rgb(90, 45, 0)',
-                    opacity: 0.8
+                    opacity: 0.4
                 },
                 effect: {
                     show: true,

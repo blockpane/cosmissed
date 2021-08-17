@@ -38,9 +38,10 @@ func (nif netInfoResp) getListenerIp() (string, error) {
 		// got a DNS name
 		ips, err := net.LookupIP(host)
 		if err != nil || len(ips) == 0 {
-			return "", fmt.Errorf("could not get ips for %s: %v", host, err)
+			return "", fmt.Errorf("could not get ip for %s: %v", host, err)
 		}
 		host = ips[0].String()
+		ipAddr = ips[0]
 	}
 	if isPrivate(ipAddr) {
 		return "", fmt.Errorf("host %s is a bad address, skipping", host)
@@ -50,7 +51,7 @@ func (nif netInfoResp) getListenerIp() (string, error) {
 
 var privateBlocks = [...]*net.IPNet{
 	parseCIDR("10.0.0.0/8"),     // RFC 1918 IPv4 private network address
-	parseCIDR("100.64.0.0/10"),  // RFC 6598 IPv4 shared address space
+	//parseCIDR("100.64.0.0/10"),  // RFC 6598 IPv4 shared address space ... TODO: no longer private?
 	parseCIDR("127.0.0.0/8"),    // RFC 1122 IPv4 loopback address
 	parseCIDR("169.254.0.0/16"), // RFC 3927 IPv4 link local address
 	parseCIDR("172.16.0.0/12"),  // RFC 1918 IPv4 private network address
