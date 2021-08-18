@@ -1,10 +1,21 @@
 package missed
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	sync "github.com/sasha-s/go-deadlock"
+	"io"
 	"net"
+	"net/http"
+	"sort"
+	"strconv"
 	"strings"
+	"time"
 )
+
+const evictDuration = 1 * time.Hour
 
 // MinNeighbor is a stripped down response from the API with only a moniker and IP
 type MinNeighbor struct {
@@ -27,12 +38,24 @@ type netInfoResp struct {
 	} `json:"result"`
 }
 
-func (nif netInfoResp) getListenerIp() (string, error) {
-	list := strings.Split(nif.Result.Listeners[0], `//`)
-	if len(list) != 2 {
-		return "", fmt.Errorf(`could not parse %+v into hostname`, nif.Result.Listeners)
+func (nif netInfoResp) getListenerIp(node string) (string, error) {
+	h := nif.Result.Listeners[0]
+	list := make([]string, 0)
+	var host string
+
+	switch {
+	case h == `Listener(@)`:
+		host = node
+	case strings.Contains(h, `//`):
+		list = strings.Split(h, `//`)
+		if len(list) != 2 {
+			return "", fmt.Errorf(`could not parse %+v into hostname`, nif.Result.Listeners)
+		}
+		host = strings.Split(list[1], `:`)[0]
+	case strings.HasPrefix(h, `Listener(@`):
+		host = strings.Split(strings.TrimPrefix(h, `Listener(@`), `:`)[0]
 	}
-	host := strings.Split(list[1], `:`)[0]
+
 	ipAddr := net.ParseIP(host)
 	if ipAddr.String() != host {
 		// got a DNS name
@@ -43,15 +66,15 @@ func (nif netInfoResp) getListenerIp() (string, error) {
 		host = ips[0].String()
 		ipAddr = ips[0]
 	}
-	if isPrivate(ipAddr) {
+	if IsPrivate(ipAddr) {
 		return "", fmt.Errorf("host %s is a bad address, skipping", host)
 	}
 	return host, nil
 }
 
 var privateBlocks = [...]*net.IPNet{
-	parseCIDR("10.0.0.0/8"), // RFC 1918 IPv4 private network address
-	//parseCIDR("100.64.0.0/10"),  // RFC 6598 IPv4 shared address space ... TODO: no longer private?
+	parseCIDR("10.0.0.0/8"),     // RFC 1918 IPv4 private network address
+	parseCIDR("100.64.0.0/10"),  // RFC 6598 IPv4 shared address space
 	parseCIDR("127.0.0.0/8"),    // RFC 1122 IPv4 loopback address
 	parseCIDR("169.254.0.0/16"), // RFC 3927 IPv4 link local address
 	parseCIDR("172.16.0.0/12"),  // RFC 1918 IPv4 private network address
@@ -74,7 +97,7 @@ func parseCIDR(s string) *net.IPNet {
 	return block
 }
 
-func isPrivate(ip net.IP) bool {
+func IsPrivate(ip net.IP) bool {
 	if ip == nil {
 		return true // presumes a true result gets rejected
 	}
@@ -84,4 +107,199 @@ func isPrivate(ip net.IP) bool {
 		}
 	}
 	return false
+}
+
+type DiscoveredNode struct {
+	Ip         string
+	Port       int
+	Skip       bool
+	ValidUntil time.Time
+}
+
+type Discovered struct {
+	mux sync.RWMutex
+
+	Nodes map[string]*DiscoveredNode
+}
+
+func NewDiscovered() *Discovered {
+	return &Discovered{
+		Nodes: make(map[string]*DiscoveredNode),
+	}
+}
+
+func (d Discovered) Skip(s string) bool {
+	d.mux.RLock()
+	defer d.mux.RUnlock()
+	if d.Nodes[s] == nil || d.Nodes[s].Skip == true {
+		return true
+	}
+	return false
+}
+
+func (d *Discovered) Add(ip net.IP, port int) error {
+	if NetworkId == "" {
+		return errors.New("cannot add dynamic peer, not ready: undetermined network id")
+	}
+	ipAddr := ip.String()
+	if ipAddr == "" {
+		return fmt.Errorf("invalid IP %+v", ip)
+	}
+	d.mux.RLock()
+	if d.Nodes[ipAddr] != nil {
+		if !d.Nodes[ipAddr].Skip {
+			d.Nodes[ipAddr].ValidUntil = time.Now().Add(evictDuration)
+		}
+		d.mux.RUnlock()
+		return nil
+	}
+	d.mux.RUnlock()
+	d.mux.Lock()
+	defer d.mux.Unlock()
+	d.Nodes[ipAddr] = &DiscoveredNode{
+		Ip:         ipAddr,
+		Port:       port,
+		Skip:       true,
+		ValidUntil: time.Now().Add(evictDuration),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", "http://"+ipAddr+":"+strconv.Itoa(port)+"/status", nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	ir := &statusResp{}
+	err = json.Unmarshal(body, ir)
+	if err != nil {
+		return err
+	}
+	d.Nodes[ipAddr] = &DiscoveredNode{
+		Ip:         ipAddr,
+		Port:       port,
+		ValidUntil: time.Now().Add(evictDuration),
+	}
+	if NetworkId == ir.Result.NodeInfo.Network {
+		d.Nodes[ipAddr].Skip = false
+	} else {
+		return fmt.Errorf("network id %s does not match %s", ir.Result.NodeInfo.Network, NetworkId)
+	}
+	return nil
+}
+
+func (d *Discovered) Trim() {
+	d.mux.Lock()
+	defer d.mux.Unlock()
+	for k := range d.Nodes {
+		if d.Nodes[k].ValidUntil.Before(time.Now()) {
+			delete(d.Nodes, k)
+		}
+	}
+}
+
+type locationCounts struct {
+	label string
+	count int
+}
+
+type NetworkStats struct {
+	PeersDiscovered int       `json:"peers_discovered"`
+	RpcDiscovered   int       `json:"rpc_discovered"`
+	CityLabels      []string  `json:"city_labels"`
+	CityCounts      []int     `json:"city_counts"`
+	CountryLabels   []string  `json:"country_labels"`
+	CountryCounts   []int     `json:"country_counts"`
+	LastUpdated     time.Time `json:"last_updated"`
+}
+
+type NodeLocation struct {
+	Region     string `json:"region"`
+	Country    string `json:"country"`
+	Coordinate point  `json:"coordinate"`
+}
+
+var nodeLocCache = make(map[string]*NodeLocation)
+
+func NetworkSummary(d *Discovered, p PeerMap) NetworkStats {
+	d.Trim()
+	ns := NetworkStats{
+		PeersDiscovered: len(d.Nodes),
+		CityLabels:      make([]string, 0),
+		CityCounts:      make([]int, 0),
+		CountryLabels:   make([]string, 0),
+		CountryCounts:   make([]int, 0),
+	}
+	for node := range d.Nodes {
+		if !d.Nodes[node].Skip {
+			ns.RpcDiscovered += 1
+		}
+	}
+	allNodes := make(map[string]bool)
+	for _, pSet := range p {
+		for _, peer := range pSet.Peers {
+			allNodes[peer.Host] = true
+		}
+	}
+	cityFound := make(map[string]int)
+	countryFound := make(map[string]int)
+	increment := func(s string, w map[string]int) {
+		w[s] += 1
+	}
+	for k := range allNodes {
+		if nodeLocCache[k] != nil {
+			increment(fmt.Sprintf("%s (%s)", nodeLocCache[k].Region, nodeLocCache[k].Country), cityFound)
+			increment(nodeLocCache[k].Country, countryFound)
+			continue
+		}
+		city, country, latlong, err := getLocation(k)
+		if err != nil {
+			continue
+		}
+		nodeLocCache[k] = &NodeLocation{
+			Region:     city,
+			Country:    country,
+			Coordinate: latlong,
+		}
+		increment(fmt.Sprintf("%s (%s)", nodeLocCache[k].Region, nodeLocCache[k].Country), cityFound)
+		increment(nodeLocCache[k].Country, countryFound)
+	}
+	cities := make([]locationCounts, 0)
+	countries := make([]locationCounts, 00)
+	for k, v := range cityFound {
+		cities = append(cities, locationCounts{
+			label: k,
+			count: v,
+		})
+	}
+	sort.Slice(cities, func(i, j int) bool {
+		return cities[i].count > cities[j].count
+	})
+	for k, v := range countryFound {
+		countries = append(countries, locationCounts{
+			label: k,
+			count: v,
+		})
+	}
+	sort.Slice(countries, func(i, j int) bool {
+		return countries[i].count > countries[j].count
+	})
+	for _, v := range cities {
+		ns.CityLabels = append(ns.CityLabels, v.label)
+		ns.CityCounts = append(ns.CityCounts, v.count)
+	}
+	for _, v := range countries {
+		ns.CountryLabels = append(ns.CountryLabels, v.label)
+		ns.CountryCounts = append(ns.CountryCounts, v.count)
+	}
+	ns.LastUpdated = time.Now().UTC()
+	return ns
 }

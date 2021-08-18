@@ -20,12 +20,15 @@ var NetHtml []byte
 var StaticContent embed.FS
 
 var (
-	bm               = bluemonday.StrictPolicy()
-	TClient, CClient *http.Client
-	TUrl, CUrl       string
-	GeoDb            *geoip2.Reader
-	l                *log.Logger
-	peerMap          PeerMap
+	bm        = bluemonday.StrictPolicy()
+	CClient   *http.Client
+	TClient   *http.Client
+	NetworkId string
+	CUrl      string
+	TUrl      string
+	GeoDb     *geoip2.Reader
+	l         *log.Logger
+	peerMap   PeerMap
 )
 
 func init() {

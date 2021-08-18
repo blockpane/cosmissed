@@ -8,6 +8,7 @@ import (
 	"fmt"
 	missed "github.com/blockpane/cosmissed"
 	"github.com/gorilla/websocket"
+	sync "github.com/sasha-s/go-deadlock"
 	"github.com/textileio/go-threads/broadcast"
 	"log"
 	"net"
@@ -21,7 +22,10 @@ import (
 	"time"
 )
 
-const lagBlocks = 3
+const (
+	lagBlocks      = 2
+	pollDiscovered = 5
+)
 
 type savedState struct {
 	CachedResult []byte
@@ -30,7 +34,8 @@ type savedState struct {
 	CachedParams []byte
 	BlockError   []byte
 	Results      []*missed.Summary
-	Successful   int
+	//Discovered   *missed.Discovered
+	Successful int
 }
 
 func main() {
@@ -90,7 +95,9 @@ func main() {
 	cachedChart := []byte("not ready")
 	cachedParams := []byte("not ready")
 	cachedMap := []byte("[]")
+	cachedNetStats := []byte("")
 	blockError := []byte(`{"missing":{"fetch error":""}}`)
+	discovered := missed.NewDiscovered()
 	var results []*missed.Summary
 
 	sigs := make(chan os.Signal, 1)
@@ -120,7 +127,8 @@ func main() {
 			CachedParams: cachedParams,
 			BlockError:   blockError,
 			Results:      results,
-			Successful:   successful,
+			//Discovered:   discovered,
+			Successful: successful,
 		}
 		e = out.Encode(ss)
 		if e != nil {
@@ -129,12 +137,13 @@ func main() {
 		l.Fatal("exiting")
 	}()
 
-	var bcastMissed, bcastTop, bcastChart, bcastMap broadcast.Broadcaster
+	var bcastMissed, bcastTop, bcastChart, bcastMap, bcastNetstats broadcast.Broadcaster
 	defer func() {
 		bcastMissed.Discard()
 		bcastTop.Discard()
 		bcastTop.Discard()
 		bcastMap.Discard()
+		bcastNetstats.Discard()
 	}()
 
 	// Additional tendermint RPC endpoints to poll for net_info
@@ -148,35 +157,6 @@ func main() {
 			xtraHosts = append(xtraHosts, split[i])
 		}
 	}
-
-	go func() {
-		fp := func() {
-			j, e := missed.FetchPeers(xtraHosts)
-			if e != nil {
-				l.Println(e)
-				return
-			}
-			if j != nil {
-				// TODO: ensure it really has changed, this may be a lot of data.
-				cachedMap = j
-				e = bcastMap.Send(cachedMap)
-				if e != nil {
-					l.Println(e)
-				}
-			}
-		}
-		time.Sleep(10 * time.Second)
-		fp()
-		tick := time.NewTicker(30 * time.Second)
-		for {
-			select {
-			case <-tick.C:
-				fp()
-			case <-closeDb:
-				_ = missed.GeoDb.Close()
-			}
-		}
-	}()
 
 	top := func() {
 		t, err := missed.TopMissed(results, track, prefix)
@@ -299,6 +279,7 @@ func main() {
 		cachedParams = state.CachedParams
 		blockError = state.BlockError
 		results = state.Results
+		//discovered = state.Discovered
 		successful = state.Successful
 		return true
 	}() {
@@ -308,6 +289,114 @@ func main() {
 		refresh()
 		top()
 	}
+
+	go func() {
+		j := make([]byte, 0)
+		netStats := missed.NetworkStats{
+			CityLabels:    make([]string, 0),
+			CityCounts:    make([]int, 0),
+			CountryLabels: make([]string, 0),
+			CountryCounts: make([]int, 0),
+		}
+		cachedNetStats, _ = json.Marshal(netStats)
+
+		var busy, peerBusy bool
+		pm := missed.PeerMap{}
+		discoveredMap := missed.PeerMap{}
+		fp := func() {
+			if busy || peerBusy {
+				l.Println("skipping update, one is already in progress")
+				return
+			}
+			busy = true
+			defer func() { busy = false }()
+			l.Println("updating remote peers from reserved nodes")
+			newPeers, e := missed.FetchPeers(xtraHosts)
+			if e != nil {
+				l.Println(e)
+				return
+			}
+			// only poll discovered peers every 5 minutes to be polite:
+			discoMux := sync.Mutex{}
+			if time.Now().Minute()%pollDiscovered == 0 {
+				go func() {
+					if peerBusy {
+						l.Println("skipping discovery, one is already in progress")
+						return
+					}
+					peerBusy = true
+					defer func() { peerBusy = false }()
+					discoMux.Lock()
+					defer discoMux.Unlock()
+					discovered.Trim()
+					l.Println("updating remote peers from discovered nodes")
+					pollNeighbors := make(map[string]bool)
+					pollMux := sync.Mutex{}
+					for i := range pm {
+						for ii := range pm[i].Peers {
+							ip := net.ParseIP(pm[i].Peers[ii].Host)
+							if !missed.IsPrivate(ip) && pm[i].Peers[ii].RpcPort != 0 {
+								if err := discovered.Add(ip, pm[i].Peers[ii].RpcPort); err != nil {
+									l.Printf(`could not add discovered peer %s: %s`, pm[i].Peers[ii].Host, err)
+									continue
+								}
+							}
+							if !discovered.Skip(pm[i].Peers[ii].Host) {
+								pollMux.Lock()
+								pollNeighbors[`http://`+pm[i].Peers[ii].Host+`:`+strconv.Itoa(pm[i].Peers[ii].RpcPort)] = true
+								pollMux.Unlock()
+							}
+						}
+					}
+					rpcs := make([]string, 0)
+					for k := range pollNeighbors {
+						rpcs = append(rpcs, k)
+					}
+					discoveredMap, e = missed.FetchPeers(rpcs)
+					if e != nil {
+						l.Println(e)
+					}
+					netStats = missed.NetworkSummary(discovered, pm)
+					cachedNetStats, _ = json.Marshal(netStats)
+					l.Println("done updating discovered peers")
+				}()
+			}
+			discoMux.Lock()
+			pm = append(newPeers, discoveredMap...)
+			discoMux.Unlock()
+			if j, e = pm.ToLinesJson(); e != nil {
+				l.Println(`error converting lines3d to json:`, e)
+			}
+			if j != nil {
+				cachedMap = j
+				e = bcastMap.Send(cachedMap)
+				if e != nil {
+					l.Println(e)
+				}
+			}
+			if j, e = json.Marshal(netStats); e == nil {
+				e = bcastNetstats.Send(j)
+				if e != nil {
+					l.Println("send netstats ws:", e)
+				}
+			}
+			l.Println("done updating reserved peers")
+		}
+		// todo: figure out why it takes two attempts to get initial set....
+		fp()
+		time.Sleep(10 * time.Second)
+		fp()
+		tick := time.NewTicker(time.Minute)
+		for {
+			select {
+			case <-tick.C:
+				go fp()
+			case <-closeDb:
+				_ = missed.GeoDb.Close()
+			}
+		}
+	}()
+
 	ready = true
 	logmod = 10
 	l.Println("cache populated, starting server.")
@@ -366,6 +455,11 @@ func main() {
 			broadcaster(writer, request, &bcastChart)
 		case "/map/ws":
 			broadcaster(writer, request, &bcastMap)
+		case "/net/ws":
+			broadcaster(writer, request, &bcastNetstats)
+		case "/net":
+			setJsonHeader(writer)
+			_, _ = writer.Write(cachedNetStats)
 		case "/chart":
 			setJsonHeader(writer)
 			_, _ = writer.Write(cachedChart)

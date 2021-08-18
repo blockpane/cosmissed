@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	sync "github.com/sasha-s/go-deadlock"
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -53,6 +56,9 @@ func CurrentHeight() (curHeight int, networkName string, err error) {
 	}
 	if sr.Result.SyncInfo.CatchingUp {
 		return 0, "", errors.New("node is catching up")
+	}
+	if NetworkId == "" {
+		NetworkId = sr.Result.NodeInfo.Network
 	}
 	curHeight, err = strconv.Atoi(sr.Result.SyncInfo.LatestBlockHeight)
 	networkName = sr.Result.NodeInfo.Network
@@ -121,28 +127,28 @@ func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 	return summarize(height, ts, proposer, signers, addrs, cons, vals, jailed, !catchingUp), nil
 }
 
-func FetchPeers(xtra []string) (j []byte, err error) {
-	_, pm, err := getNeighbors("")
+func FetchPeers(xtra []string) (j PeerMap, err error) {
+	_, pm, err := GetNeighbors("")
 	if err != nil {
 		return nil, err
 	}
 	m := PeerMap{pm}
 	for _, s := range xtra {
-		_, pm, err = getNeighbors(s)
-		if err != nil {
-			l.Println(err)
-			continue
+		_, neighbor, e := GetNeighbors(s)
+		if e != nil {
+			l.Println(e)
+			return
 		}
-		m = append(m, pm)
+		m = append(m, neighbor)
 	}
-	// TODO: recurse (and cache) list of peers with RPC exposed.
-	return m.ToLinesJson()
+	return m, nil
 }
 
 var cachedPoints = make(map[string]point)
+var cacheMux = sync.Mutex{}
 
-// getNeighbors calls the RCP endpoint asking for neighbors.
-func getNeighbors(node string) (source string, peers PeerSet, e error) {
+// GetNeighbors calls the RCP endpoint asking for neighbors.
+func GetNeighbors(node string) (source string, peers PeerSet, e error) {
 	empty := PeerSet{}
 	if GeoDb == nil {
 		return "", empty, errors.New("no geoip database is loaded, skipping peer discovery")
@@ -165,7 +171,7 @@ func getNeighbors(node string) (source string, peers PeerSet, e error) {
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", empty, err
+		return "", empty, fmt.Errorf("GetNeighbors %s: %s", node, err.Error())
 	}
 	defer resp.Body.Close()
 	ni := &netInfoResp{}
@@ -173,12 +179,13 @@ func getNeighbors(node string) (source string, peers PeerSet, e error) {
 	if err != nil {
 		return "", empty, err
 	}
-	listenerIp, err := ni.getListenerIp()
+	listenerIp, err := ni.getListenerIp(strings.Split(strings.TrimPrefix(node, `http://`), `:`)[0])
 	if err != nil {
 		return "", empty, err
 	}
 
 	var lat, long float32
+	cacheMux.Lock()
 	LongLat := cachedPoints[listenerIp]
 	if LongLat[0] == 0 {
 		long, lat, e = getLatLong(listenerIp)
@@ -188,6 +195,7 @@ func getNeighbors(node string) (source string, peers PeerSet, e error) {
 		LongLat = point{lat, long}
 		cachedPoints[listenerIp] = LongLat
 	}
+	cacheMux.Unlock()
 
 	result := PeerSet{
 		Host:        listenerIp,
@@ -195,22 +203,34 @@ func getNeighbors(node string) (source string, peers PeerSet, e error) {
 		Peers:       make([]Peer, 0),
 	}
 	for _, p := range ni.Result.Peers {
+		cacheMux.Lock()
 		ll := cachedPoints[p.RemoteIp]
+		cacheMux.Unlock()
 		if ll[0] == 0 {
 			long, lat, e = getLatLong(p.RemoteIp)
 			if e != nil {
-				l.Println(e)
 				continue
 			}
 			LongLat = point{lat, long}
+			cacheMux.Lock()
 			cachedPoints[p.RemoteIp] = LongLat
+			cacheMux.Unlock()
+		}
+		port := 0
+		if p.NodeInfo.Other.RpcAddress == `@` {
+			port = 26657
+		} else if !strings.Contains(p.NodeInfo.Other.RpcAddress, `127.0.0.1`) && !strings.Contains(p.NodeInfo.Other.RpcAddress, `unix://`) {
+			pSplit := strings.Split(p.NodeInfo.Other.RpcAddress, `:`)
+			if port, err = strconv.Atoi(pSplit[len(pSplit)-1]); err != nil {
+				l.Printf(`could not parse port from %s: %s`, p.NodeInfo.Other.RpcAddress, err.Error())
+			}
 		}
 		result.Peers = append(result.Peers, Peer{
 			Host:        p.RemoteIp,
+			RpcPort:     port,
 			Coordinates: ll,
 			Outbound:    p.NodeInfo.IsOutbound,
 		})
 	}
-
 	return listenerIp, result, nil
 }

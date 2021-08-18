@@ -4,15 +4,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/oschwald/geoip2-golang"
 	"net"
 )
 
+type GeoLightErr struct{}
+
+func (g GeoLightErr) Error() string {
+	return "geolight database not loaded"
+}
+
 func getLatLong(ipAddr string) (float32, float32, error) {
 	if GeoDb == nil {
-		return 0, 0, errors.New("geolight db not loaded")
+		return 0, 0, GeoLightErr{}
 	}
 	ip := net.ParseIP(ipAddr)
-	if ip.String() != ipAddr || isPrivate(ip) {
+	if ip.String() != ipAddr || IsPrivate(ip) {
 		return 0, 0, fmt.Errorf("ip %s is invalid for geo lookup", ipAddr)
 	}
 	record, err := GeoDb.City(ip)
@@ -20,6 +27,36 @@ func getLatLong(ipAddr string) (float32, float32, error) {
 		return 0, 0, err
 	}
 	return float32(record.Location.Latitude), float32(record.Location.Longitude), err
+}
+
+func getLocation(ipAddr string) (cityName string, country string, latLong point, err error) {
+	if GeoDb == nil {
+		err = GeoLightErr{}
+		return
+	}
+	ip := net.ParseIP(ipAddr)
+	if ip == nil || IsPrivate(ip) {
+		err = fmt.Errorf("%s is not valid for geo lookup")
+		return
+	}
+	city := &geoip2.City{}
+	city, err = GeoDb.City(ip)
+
+	if err != nil {
+		return
+	}
+	cityName = city.City.Names["en"]
+	if cityName == "" {
+		cityName = "Unknown"
+		if isp, e := GeoDb.ISP(ip); e == nil && isp.ISP != "" {
+			cityName = isp.ISP
+		}
+	}
+	country = city.Country.Names["en"]
+	if country == "" {
+		country = "Unknown"
+	}
+	return cityName, country, point{float32(city.Location.Latitude), float32(city.Location.Longitude)}, err
 }
 
 type PeerSet struct {
@@ -30,6 +67,7 @@ type PeerSet struct {
 
 type Peer struct {
 	Host        string `json:"host"`
+	RpcPort     int    `json:"rpc_port"`
 	Coordinates point  `json:"coordinates"`
 	Outbound    bool   `json:"incoming"`
 }
@@ -61,7 +99,7 @@ func (ps PeerSet) toLines3d() ([]line3d, error) {
 	}
 	result := make([]line3d, 0)
 	for _, p := range ps.Peers {
-		if p.Coordinates == [2]float32{0, 0} || isPrivate(net.ParseIP(p.Host)) {
+		if p.Coordinates == [2]float32{0, 0} || IsPrivate(net.ParseIP(p.Host)) {
 			// don't map 0,0 or private IPs
 			continue
 		}

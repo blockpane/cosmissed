@@ -1,5 +1,29 @@
 async function getGeo() {
     try {
+        const resp = await fetch("/params", {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-cache',
+            credentials: 'same-origin',
+            redirect: 'error',
+            referrerPolicy: 'no-referrer'
+        });
+        const params = await resp.json()
+        document.getElementById('networkId').innerHTML = params.chain
+
+        const netInfo = await fetch("/net", {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-cache',
+            credentials: 'same-origin',
+            redirect: 'error',
+            referrerPolicy: 'no-referrer'
+        });
+        const netParams = await netInfo.json()
+        document.getElementById('totalNodes').innerHTML = netParams.peers_discovered
+        document.getElementById('rpcNodes').innerHTML = netParams.rpc_discovered
+        document.getElementById('lastUpdate').innerHTML = netParams.last_updated
+
         const response = await fetch("/map", {
             method: 'GET',
             mode: 'cors',
@@ -22,17 +46,18 @@ async function getGeo() {
                 shading: 'color',
                 light: {
                     ambient: {
-                        intensity: 0.2
+                        intensity: 0.1
                     },
                     main: {
-                        intensity: 0.00
+                        intensity: 0.0
                     }
                 },
                 viewControl: {
-                    autoRotate: true,
-                    autoRotateSpeed: 4,
-                    distance: 200,
-                    alpha: 25,
+                    autoRotate: false,
+                    minDistance: 20,
+                    //autoRotateSpeed: 4,
+                    //distance: 200,
+                    //alpha: 25,
                 }
             },
             series: {
@@ -40,16 +65,18 @@ async function getGeo() {
                 coordinateSystem: 'globe',
                 blendMode: 'lighter',
                 lineStyle: {
-                    width: 2,
+                    width: 1,
                     color: 'rgb(90, 45, 0)',
-                    opacity: 0.4
+                    //color: 'rgb(32,25,73)',
+                    opacity: 0.3
                 },
                 effect: {
                     show: true,
-                    trailWidth: 2,
-                    trailOpacity: 0.4,
-                    trailLength: 0.2,
-                    constantSpeed: 80
+                    trailWidth: 1,
+                    trailOpacity: 0.8,
+                    trailLength: 0.05,
+                    period: 5,
+                    //constantSpeed: 40
                 },
                 data: pex
             }
@@ -76,6 +103,24 @@ async function getGeo() {
             };
         }
         connectGlobe()
+
+        function connectNet() {
+            const socket = new WebSocket(wsProto + location.host + '/net/ws');
+            socket.addEventListener('message', function (event) {
+                const updNet = JSON.parse(event.data);
+                document.getElementById('totalNodes').innerHTML = updNet.peers_discovered
+                document.getElementById('rpcNodes').innerHTML = updNet.rpc_discovered
+                document.getElementById('lastUpdate').innerHTML = updNet.last_updated
+            });
+            socket.onclose = function(e) {
+                console.log('Socket is closed, retrying /net/ws ...', e.reason);
+                setTimeout(function() {
+                    connectNet();
+                }, 4000);
+            };
+        }
+        connectNet()
+
     }
     catch (e) {
         console.log(e)
