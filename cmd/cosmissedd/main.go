@@ -364,20 +364,22 @@ func main() {
 			discoMux.Lock()
 			pm = append(newPeers, discoveredMap...)
 			discoMux.Unlock()
-			if j, e = pm.ToLinesJson(); e != nil {
-				l.Println(`error converting lines3d to json:`, e)
-			}
-			if j != nil {
-				cachedMap = j
-				e = bcastMap.Send(cachedMap)
-				if e != nil {
-					l.Println(e)
+			if !peerBusy {
+				if j, e = pm.ToLinesJson(); e != nil {
+					l.Println(`error converting lines3d to json:`, e)
 				}
-			}
-			if j, e = json.Marshal(netStats); e == nil {
-				e = bcastNetstats.Send(j)
-				if e != nil {
-					l.Println("send netstats ws:", e)
+				if j != nil {
+					cachedMap = j
+					e = bcastMap.Send(cachedMap)
+					if e != nil {
+						l.Println(e)
+					}
+				}
+				if j, e = json.Marshal(netStats); e == nil {
+					e = bcastNetstats.Send(j)
+					if e != nil {
+						l.Println("send netstats ws:", e)
+					}
 				}
 			}
 			l.Println("done updating reserved peers")
