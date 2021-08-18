@@ -211,6 +211,12 @@ type locationCounts struct {
 	count int
 }
 
+type Sunburst struct {
+	Name string `json:"name"`
+	Value int `json:"value"`
+	Children []Sunburst `json:"children,omitempty"`
+}
+
 type NetworkStats struct {
 	PeersDiscovered int       `json:"peers_discovered"`
 	RpcDiscovered   int       `json:"rpc_discovered"`
@@ -219,38 +225,45 @@ type NetworkStats struct {
 	CountryLabels   []string  `json:"country_labels"`
 	CountryCounts   []int     `json:"country_counts"`
 	LastUpdated     time.Time `json:"last_updated"`
+	Sunburst        []Sunburst `json:"sunburst"`
+	Providers       []Sunburst `json:"providers"`
 }
 
 type NodeLocation struct {
 	Region     string `json:"region"`
 	Country    string `json:"country"`
 	Coordinate point  `json:"coordinate"`
+	Isp        string `json:"isp"`
 }
 
 var nodeLocCache = make(map[string]*NodeLocation)
 
 func NetworkSummary(d *Discovered, p PeerMap) NetworkStats {
+	if d == nil {
+		return NetworkStats{}
+	}
 	d.Trim()
 	ns := NetworkStats{
-		PeersDiscovered: len(d.Nodes),
 		CityLabels:      make([]string, 0),
 		CityCounts:      make([]int, 0),
 		CountryLabels:   make([]string, 0),
 		CountryCounts:   make([]int, 0),
-	}
-	for node := range d.Nodes {
-		if !d.Nodes[node].Skip {
-			ns.RpcDiscovered += 1
-		}
+		Sunburst:        make([]Sunburst, 0),
+		Providers:       make([]Sunburst, 0),
+		RpcDiscovered:   len(p),
 	}
 	allNodes := make(map[string]bool)
 	for _, pSet := range p {
 		for _, peer := range pSet.Peers {
+			if IsPrivate(net.ParseIP(peer.Host)){
+				continue
+			}
 			allNodes[peer.Host] = true
 		}
 	}
 	cityFound := make(map[string]int)
 	countryFound := make(map[string]int)
+	ispList := make(map[string]map[string]map[string]int)
 	increment := func(s string, w map[string]int) {
 		w[s] += 1
 	}
@@ -260,7 +273,7 @@ func NetworkSummary(d *Discovered, p PeerMap) NetworkStats {
 			increment(nodeLocCache[k].Country, countryFound)
 			continue
 		}
-		city, country, latlong, err := getLocation(k)
+		city, country, isp, latlong, err := getLocation(k)
 		if err != nil {
 			continue
 		}
@@ -268,12 +281,48 @@ func NetworkSummary(d *Discovered, p PeerMap) NetworkStats {
 			Region:     city,
 			Country:    country,
 			Coordinate: latlong,
+			Isp:        isp,
 		}
 		increment(fmt.Sprintf("%s (%s)", nodeLocCache[k].Region, nodeLocCache[k].Country), cityFound)
 		increment(nodeLocCache[k].Country, countryFound)
+		switch {
+		case ispList[isp] == nil:
+			ispList[isp] = make(map[string]map[string]int)
+			fallthrough
+		case ispList[isp][country] == nil:
+			ispList[isp][country] = make(map[string]int)
+		}
+		ispList[isp][country][city] += 1
+	}
+	//delete(ispList, "Unknown")
+	for ispName, countryMap := range ispList {
+		var ispCounter int
+		iBurst := Sunburst{
+			Name:     ispName,
+			Children: make([]Sunburst, 0),
+		}
+		for countryName, cityMap := range countryMap {
+			var countryCounter int
+			countryBurst := Sunburst{
+				Name:     countryName,
+				Children: make([]Sunburst, 0),
+			}
+			for cityName, cityCount := range cityMap {
+				countryBurst.Children = append(countryBurst.Children, Sunburst{
+					Name:     cityName,
+					Value:    cityCount,
+				})
+				ispCounter += cityCount
+				countryCounter += cityCount
+			}
+			countryBurst.Value = countryCounter
+			iBurst.Children = append(iBurst.Children, countryBurst)
+		}
+		iBurst.Value = ispCounter
+		ns.Providers = append(ns.Providers, iBurst)
 	}
 	cities := make([]locationCounts, 0)
-	countries := make([]locationCounts, 00)
+	countries := make([]locationCounts, 0)
 	for k, v := range cityFound {
 		cities = append(cities, locationCounts{
 			label: k,
@@ -299,6 +348,23 @@ func NetworkSummary(d *Discovered, p PeerMap) NetworkStats {
 	for _, v := range countries {
 		ns.CountryLabels = append(ns.CountryLabels, v.label)
 		ns.CountryCounts = append(ns.CountryCounts, v.count)
+	}
+	for _, c := range countries {
+		s := Sunburst{
+			Name:     c.label,
+			Value:    c.count,
+			Children: make([]Sunburst, 0),
+		}
+		match := "("+s.Name+")"
+		for _, ci := range cities {
+			if strings.HasSuffix(ci.label, match) {
+				s.Children = append(s.Children, Sunburst{
+					Name:     ci.label,
+					Value:    ci.count,
+				})
+			}
+		}
+		ns.Sunburst = append(ns.Sunburst, s)
 	}
 	ns.LastUpdated = time.Now().UTC()
 	return ns

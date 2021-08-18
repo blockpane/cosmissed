@@ -22,7 +22,11 @@ async function getGeo() {
         const netParams = await netInfo.json()
         document.getElementById('totalNodes').innerHTML = netParams.peers_discovered
         document.getElementById('rpcNodes').innerHTML = netParams.rpc_discovered
-        document.getElementById('lastUpdate').innerHTML = netParams.last_updated
+        let lupd = netParams.last_updated
+        if (lupd === '0001-01-01T00:00:00Z') {
+            lupd = 'Please standby, updating peers can take up to 5 minutes.'
+        }
+        document.getElementById('lastUpdate').innerHTML = lupd
 
         const response = await fetch("/map", {
             method: 'GET',
@@ -39,7 +43,7 @@ async function getGeo() {
 
         let option;
         option = {
-            backgroundColor: '#000',
+            backgroundColor: 'rgba(7, 7, 7, 1)',
             globe: {
                 baseTexture: '/img/world.topo.bathy.200401.jpg',
                 heightTexture: '/img/bathymetry_bw_composite_4k.jpg',
@@ -72,7 +76,7 @@ async function getGeo() {
                 },
                 effect: {
                     show: true,
-                    trailWidth: 1,
+                    trailWidth: 2,
                     trailOpacity: 0.8,
                     trailLength: 0.05,
                     period: 5,
@@ -83,6 +87,64 @@ async function getGeo() {
         };
 
         option && globeChart.setOption(option);
+
+        const sunDom = document.getElementById('sunburst');
+        const sunChart = echarts.init(sunDom);
+
+        let sunOption;
+        sunOption = {
+            textStyle: {
+                color: 'rgba(255, 255, 255, 0.7)'
+            },
+            backgroundColor: 'rgba(255, 255, 255, 0.0)',
+            title: {
+                text: 'City in Top 5 Countries',
+                left: 'center'
+            },
+            visualMap: {
+                type: 'continuous',
+                min: 0,
+                max: 10,
+                inRange: {
+                    //color: ['rgb(89,71,190)', '#537b13', '#ceaf24', 'rgb(232,133,31)']
+                    color: ['rgb(94,39,0)', 'rgb(255,138,22)']
+                },
+            },
+            tooltip: {
+                trigger: 'item'
+            },
+            series: {
+                type: 'sunburst',
+                data: netParams.sunburst.slice(0,5),
+                radius: [0, '90%'],
+                //label: {
+                //    rotate: 'radial'
+                //}
+                emphasis: {
+                    focus: 'ancestor'
+                },
+
+                levels: [{},{
+                        r0: '0',
+                        r: '25%',
+                        itemStyle: {
+                            borderWidth: 1
+                        },
+                        label: {
+                            rotate: 'tangential'
+                        }
+                    }, {
+                        r0: '25%',
+                        r: '75%',
+                        label: {
+                            align: 'left'
+                        }
+                    },
+                ],
+            },
+
+        };
+        sunOption && sunChart.setOption(sunOption);
 
         let wsProto = "ws://"
         if (location.protocol === "https:") {
@@ -110,7 +172,13 @@ async function getGeo() {
                 const updNet = JSON.parse(event.data);
                 document.getElementById('totalNodes').innerHTML = updNet.peers_discovered
                 document.getElementById('rpcNodes').innerHTML = updNet.rpc_discovered
-                document.getElementById('lastUpdate').innerHTML = updNet.last_updated
+                let lupd = updNet.last_updated
+                if (lupd === '0001-01-01T00:00:00Z') {
+                    lupd = 'Please standby, updating peers can take up to 5 minutes.'
+                }
+                document.getElementById('lastUpdate').innerHTML = lupd
+                sunOption.series.data = updNet.sunburst.slice(0,5);
+                sunChart.setOption(sunOption);
             });
             socket.onclose = function(e) {
                 console.log('Socket is closed, retrying /net/ws ...', e.reason);

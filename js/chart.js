@@ -15,7 +15,10 @@ async function query() {
         let option;
 
         option = {
-            backgroundColor: '#fff',
+            backgroundColor: 'rgba(255, 255, 255, 0.0)',
+            textStyle: {
+                color: 'rgba(255, 255, 255, 0.7)'
+            },
             title: {
                 text: 'Missing Signatures',
                 left: 'center'

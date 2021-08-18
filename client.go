@@ -127,21 +127,23 @@ func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 	return summarize(height, ts, proposer, signers, addrs, cons, vals, jailed, !catchingUp), nil
 }
 
-func FetchPeers(xtra []string) (j PeerMap, err error) {
-	_, pm, err := GetNeighbors("")
-	if err != nil {
-		return nil, err
+func FetchPeers(xtra []string) (peers PeerMap) {
+	if xtra == nil {
+		_, pm, err := GetNeighbors("")
+		if err != nil {
+			l.Println(err)
+		}
+		peers = append(peers, pm)
 	}
-	m := PeerMap{pm}
 	for _, s := range xtra {
 		_, neighbor, e := GetNeighbors(s)
 		if e != nil {
 			l.Println(e)
-			return
+			continue
 		}
-		m = append(m, neighbor)
+		peers = append(peers, neighbor)
 	}
-	return m, nil
+	return
 }
 
 var cachedPoints = make(map[string]point)

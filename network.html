@@ -4,33 +4,49 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Monitor</title>
-  <link rel="stylesheet" href="css/bootstrap.min.css">
-  <script src="js/echarts.min.js"></script>
-  <script src="js/echarts-gl.min.js"></script>
+  <link rel="stylesheet" href="/css/bootstrap.min.css">
+  <script src="/js/echarts.min.js"></script>
+  <script src="/js/echarts-gl.min.js"></script>
   <link rel="icon" href="/img/favicon.png">
 </head>
 <body onload="showGlobe()">
-<div class="container-xl" style=" padding-top: 20px;">
-  <div class="row">
+<div class="container-xl border-bottom border-info" style="padding-top: 20px;">
+  <div class="row" style="padding-bottom: 10px;">
     <div class="col-4">
       <h3><span id="networkId" class="text-capitalize"></span> Monitor</h3>
     </div>
-    <div class="col-8">
-      <div class="row">
-        <div class="col-2">
-          Nodes Seen <span id="totalNodes" class="fw-bold"></span>
+    <div class="col-4 d-flex justify-content-center btn-group btn-group-sm">
+      <a href="/"><button class="btn btn-secondary">Missed Blocks</button></a>
+      <a href="/network.html"><button class="btn btn-info">Network</button></a>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-12">
+      <div class="row text-center">
+        <div class="col-4">
+          Nodes: <span id="totalNodes" class="fw-bold"></span>
         </div>
-        <div class="col-3">
-          Sharing Peers <span id="rpcNodes" class="fw-bold"></span>
+        <div class="col-4">
+          Sources: <span id="rpcNodes" class="fw-bold"></span>
         </div>
-        <div class="col-7">
-          Updated <span id="lastUpdate"></span>
+        <div class="col-4">
+          Updated: <span id="lastUpdate"></span>
         </div>
       </div>
     </div>
-    <div>&nbsp;</div>
+    <div>&nbsp;
+    </div>
   </div>
-  <div class="row rounded-3 shadow-lg" id="globe" style="background: #000; height: 800px; padding-bottom: 30px;"></div>
+</div>
+<div class="container-xl" style=" padding-top: 20px;">
+
+  <div class="row">
+    <div class="col-4">
+      <div id="sunburst" style="height: 400px;"></div>
+      <div id="cities"></div>
+    </div>
+    <div class="col-8 rounded-3 shadow" id="globe" style="height: 800px; padding-bottom: 30px;"></div>
+  </div>
   <div class="row" style="padding-top: 30px;">
     <p align="center">
       <a href="https://blockpane.com"><img src="img/bp-logo-text.svg" height="30" alt="© 2021 Block Pane LLC."></a>&nbsp;

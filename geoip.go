@@ -29,7 +29,7 @@ func getLatLong(ipAddr string) (float32, float32, error) {
 	return float32(record.Location.Latitude), float32(record.Location.Longitude), err
 }
 
-func getLocation(ipAddr string) (cityName string, country string, latLong point, err error) {
+func getLocation(ipAddr string) (cityName, country, provider string, latLong point, err error) {
 	if GeoDb == nil {
 		err = GeoLightErr{}
 		return
@@ -48,15 +48,18 @@ func getLocation(ipAddr string) (cityName string, country string, latLong point,
 	cityName = city.City.Names["en"]
 	if cityName == "" {
 		cityName = "Unknown"
-		if isp, e := GeoDb.ISP(ip); e == nil && isp.ISP != "" {
-			cityName = isp.ISP
-		}
 	}
-	country = city.Country.Names["en"]
+	isp, _ := GeoDb.ISP(ip)
+	if isp == nil || isp.AutonomousSystemOrganization == "" {
+		provider = "Unknown"
+	} else {
+		provider = isp.AutonomousSystemOrganization
+	}
+	country = city.Country.IsoCode
 	if country == "" {
 		country = "Unknown"
 	}
-	return cityName, country, point{float32(city.Location.Latitude), float32(city.Location.Longitude)}, err
+	return cityName, country, provider, point{float32(city.Location.Latitude), float32(city.Location.Longitude)}, err
 }
 
 type PeerSet struct {
@@ -74,17 +77,22 @@ type Peer struct {
 
 type PeerMap []PeerSet
 
-func (pm PeerMap) ToLinesJson() ([]byte, error) {
+func (pm PeerMap) ToLinesJson() (int, []byte, error) {
 	allLines := make([]line3d, 0)
+	uniq := make(map[string]bool)
 	for _, peer := range pm {
+		for _, h := range peer.Peers {
+			uniq[h.Host] = true
+		}
 		lines, err := peer.toLines3d()
 		if err != nil {
-			l.Println(err)
+			l.Println(peer.Host, err)
 			continue
 		}
 		allLines = append(allLines, lines...)
 	}
-	return json.Marshal(allLines)
+	j, e := json.Marshal(allLines)
+	return len(uniq), j, e
 }
 
 type point [2]float32
