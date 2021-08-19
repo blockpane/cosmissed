@@ -3,5 +3,5 @@ local/*
 .DS_Store
 docker-compose.yaml
 dist
-
+GeoLite2-City.mmdb
 cosmissed.dat

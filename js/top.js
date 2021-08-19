@@ -52,7 +52,10 @@ async function topMissed() {
 
         let option;
         option = {
-            backgroundColor: '#fff',
+            backgroundColor: 'rgba(0, 0, 0, 0.0)',
+            textStyle: {
+                color: 'rgba(255, 255, 255, 0.7)'
+            },
             tooltip: {
                 trigger: 'axis',
                 axisPointer: {
@@ -62,12 +65,20 @@ async function topMissed() {
             legend: {
                 data: ['Missed %', "Vote Weight"]
             },
-            grid: {
-                left: '6%',
-                right: '4%',
-                bottom: '3%',
-                containLabel: true
-            },
+            //grid: [{
+            //    width: "50%",
+            //    //left: '6%',
+            //    //right: '55%',
+            //    //bottom: '3%',
+            //    containLabel: true
+            //},
+            //{
+            //    width: "45%",
+            //    //left: '55%',
+            //    //right: '4%',
+            //    //bottom: '3%',
+            //    containLabel: true
+            //}],
             xAxis: {
                 type: 'value',
                 inverse: true
@@ -84,6 +95,7 @@ async function topMissed() {
                     label: {
                         show: true,
                         position: 'inside',
+                        padding: 2,
                     },
                     emphasis: {
                         focus: 'series'
@@ -106,7 +118,9 @@ async function topMissed() {
                     stack: 'total',
                     label: {
                         show: true,
-                        position: 'right'
+                        //position: 'right'
+                        position: 'inside',
+                        padding: 2,
                     },
                     emphasis: {
                         focus: 'series'

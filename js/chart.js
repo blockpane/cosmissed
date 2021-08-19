@@ -15,7 +15,10 @@ async function query() {
         let option;
 
         option = {
-            backgroundColor: '#fff',
+            backgroundColor: 'rgba(255, 255, 255, 0.0)',
+            textStyle: {
+                color: 'rgba(255, 255, 255, 0.7)'
+            },
             title: {
                 text: 'Missing Signatures',
                 left: 'center'
@@ -45,7 +48,7 @@ async function query() {
                     backgroundColor: 'rgba(104,104,104,0.22)',
                     dataBackground: {
                         lineStyle: {
-                            color: '#000',
+                            color: '#333',
                             width: 2,
                         }
                     }
@@ -77,7 +80,7 @@ async function query() {
                     data: data.blocks,
                     position: 'top',
                     axisLabel: {
-                        color: '#000',
+                        color: '#fff',
                         verticalAlign: 'bottom',
                     },
                 }

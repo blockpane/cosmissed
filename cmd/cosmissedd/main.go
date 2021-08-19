@@ -12,6 +12,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -20,7 +21,10 @@ import (
 	"time"
 )
 
-const lagBlocks = 3
+const (
+	lagBlocks      = 2
+	pollDiscovered = 5
+)
 
 type savedState struct {
 	CachedResult []byte
@@ -29,16 +33,19 @@ type savedState struct {
 	CachedParams []byte
 	BlockError   []byte
 	Results      []*missed.Summary
+	Discovered   *missed.Discovered
+	PeerMap      missed.PeerMap
 	Successful   int
+	GeoCache     *missed.GeoCache
 }
 
 func main() {
 	l := log.New(os.Stderr, "cosmissed | ", log.Lshortfile|log.LstdFlags)
 
 	var (
-		current, successful, track, listen                    int
-		cosmosApi, tendermintApi, prefix, networkName, socket, cacheFile string
-		ready, stdout                                         bool
+		current, successful, track, listen                                          int
+		cosmosApi, tendermintApi, prefix, networkName, socket, cacheFile, xRpcHosts, user, apiKey string
+		ready, stdout                                                               bool
 	)
 
 	flag.StringVar(&cosmosApi, "c", "http://127.0.0.1:1317", "cosmos http API endpoint")
@@ -46,11 +53,19 @@ func main() {
 	flag.StringVar(&prefix, "p", "cosmos", "address prefix, ex- cosmos = cosmosvaloper, cosmosvalcons ...")
 	flag.StringVar(&socket, "socket", "", "filename for unix socket to listen on, if set will disable TCP listener")
 	flag.StringVar(&cacheFile, "cache", "cosmissed.dat", "filename for caching previous blocks")
+	flag.StringVar(&xRpcHosts, "extra-rpc", "", "extra tendermint RPC endpoints to poll for peer info, comma seperated list of URLs")
+	flag.StringVar(&user, "user", "", "Required: Username for GeoIP2 Precision Web Service")
+	flag.StringVar(&apiKey, "key", "", "Required: Key for GeoIP2 Precision Web Service")
 	flag.IntVar(&listen, "l", 8080, "webserver port to listen on")
 	flag.IntVar(&track, "n", 3000, "most recent blocks to track")
 	flag.BoolVar(&stdout, "v", false, "log new records to stdout (error logs already on stderr)")
 
 	flag.Parse()
+
+	if user == "" || apiKey == "" {
+		l.Fatal("the '-user' and '-key' options are required")
+	}
+
 
 	switch {
 	case strings.HasPrefix(cosmosApi, "unix://"):
@@ -83,18 +98,27 @@ func main() {
 		missed.TUrl = tendermintApi
 	}
 
-	cachedResult := []byte("not ready")
-	cachedTop := []byte("not ready")
-	cachedChart := []byte("not ready")
-	cachedParams := []byte("not ready")
+	cachedResult := []byte("{}")
+	cachedTop := []byte("{}")
+	cachedChart := []byte("{}")
+	cachedParams, _ := json.Marshal(missed.Params{})
+	cachedMap := []byte("[]")
+	cachedNetStats := []byte("{}")
 	blockError := []byte(`{"missing":{"fetch error":""}}`)
+	pm := missed.PeerMap(make([]missed.PeerSet, 0))
+	discovered := missed.NewDiscovered()
 	var results []*missed.Summary
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	//closeDb := make(chan interface{})
 
 	go func() {
 		sig := <-sigs
+		//if missed.GeoDb != nil {
+		//	// prevent race using channel to close
+		//	close(closeDb)
+		//}
 		if socket != "" {
 			os.Remove(socket)
 		}
@@ -112,7 +136,10 @@ func main() {
 			CachedParams: cachedParams,
 			BlockError:   blockError,
 			Results:      results,
+			PeerMap:      pm,
+			Discovered:   discovered,
 			Successful:   successful,
+			GeoCache:     missed.MMCache,
 		}
 		e = out.Encode(ss)
 		if e != nil {
@@ -121,9 +148,26 @@ func main() {
 		l.Fatal("exiting")
 	}()
 
-	var bcastMissed, bcastTop, bcastChart broadcast.Broadcaster
-	defer bcastMissed.Discard()
-	defer bcastTop.Discard()
+	var bcastMissed, bcastTop, bcastChart, bcastMap, bcastNetstats broadcast.Broadcaster
+	defer func() {
+		bcastMissed.Discard()
+		bcastTop.Discard()
+		bcastTop.Discard()
+		bcastMap.Discard()
+		bcastNetstats.Discard()
+	}()
+
+	// Additional tendermint RPC endpoints to poll for net_info
+	xtraHosts := make([]string, 0)
+	if xRpcHosts != "" {
+		split := strings.Split(xRpcHosts, ",")
+		for i := range split {
+			if _, e := url.Parse(strings.Trim(split[i], " ")); e != nil {
+				l.Fatalf(`invalid -extra-rpc value: %s, is not a URL.`, split[i])
+			}
+			xtraHosts = append(xtraHosts, split[i])
+		}
+	}
 
 	top := func() {
 		t, err := missed.TopMissed(results, track, prefix)
@@ -246,19 +290,123 @@ func main() {
 		cachedParams = state.CachedParams
 		blockError = state.BlockError
 		results = state.Results
+		pm = state.PeerMap
+		discovered = state.Discovered
 		successful = state.Successful
+		missed.MMCache = state.GeoCache
+		if !missed.MMCache.SetAuth(user, apiKey) {
+			l.Fatal("could not set maxmind credentials")
+		}
 		return true
 	}() {
+		if !missed.MMCache.SetAuth(user, apiKey) {
+			l.Fatal("could not set maxmind credentials")
+		}
 		results = make([]*missed.Summary, track)
 		successful = current - track - lagBlocks - 1
 		l.Printf("fetching last %d blocks, please wait\n", track)
 		refresh()
 		top()
 	}
+
+	go func() {
+		j := make([]byte, 0)
+		netStats := missed.NetworkStats{
+			CityLabels:    make([]string, 0),
+			CityCounts:    make([]int, 0),
+			CountryLabels: make([]string, 0),
+			CountryCounts: make([]int, 0),
+		}
+		cachedNetStats, _ = json.Marshal(netStats)
+
+		// if loading cache didn't work, these will be nil
+		if discovered == nil {
+			discovered = missed.NewDiscovered()
+		}
+		if pm == nil {
+			pm = make([]missed.PeerSet, 0)
+		}
+
+		var busy bool
+		newDiscovered := missed.PeerMap(make([]missed.PeerSet, 0))
+		findPeers := func() {
+			if busy {
+				l.Println("skipping update, one is already in progress")
+				return
+			}
+			busy = true
+			defer func() { busy = false }()
+			var e error
+
+			l.Println("updating remote peers from reserved nodes")
+			newPeers := missed.FetchPeers(xtraHosts)
+			newPeers = append(newPeers, missed.FetchPeers(nil)...)
+			// only poll discovered peers every 5 minutes to be polite:
+			l.Println("updating remote peers from discovered nodes")
+			pollNeighbors := make(map[string]bool)
+			for i := range pm {
+				for ii := range pm[i].Peers {
+					ip := net.ParseIP(pm[i].Peers[ii].Host)
+					if !missed.IsPrivate(ip) && pm[i].Peers[ii].RpcPort != 0 {
+						if err := discovered.Add(ip, pm[i].Peers[ii].RpcPort); err != nil {
+							l.Printf(`could not add discovered peer %s: %s`, pm[i].Peers[ii].Host, err)
+							continue
+						}
+					}
+					if !discovered.Skip(pm[i].Peers[ii].Host) {
+						pollNeighbors[`http://`+pm[i].Peers[ii].Host+`:`+strconv.Itoa(pm[i].Peers[ii].RpcPort)] = true
+					}
+				}
+			}
+			rpcs := make([]string, 0)
+			for k := range pollNeighbors {
+				rpcs = append(rpcs, k)
+			}
+			tmpDisco := missed.FetchPeers(rpcs)
+			if len(tmpDisco) >= len(newDiscovered) {
+				newDiscovered = tmpDisco
+			}
+
+			l.Println("done updating discovered peers")
+
+			log.Println("newPeers", len(newPeers), "newDiscovered", len(newDiscovered))
+			pm = append(newPeers, newDiscovered...)
+			l.Printf("tracking %d hosts", len(discovered.Nodes))
+			var count int
+			if count, j, e = pm.ToLinesJson(); e != nil {
+				l.Println(`error converting lines3d to json:`, e)
+			} else {
+				if j != nil {
+					cachedMap = j
+					e = bcastMap.Send(cachedMap)
+					if e != nil {
+						l.Println(e)
+					}
+				}
+			}
+			netStats = missed.NetworkSummary(discovered, pm)
+			netStats.PeersDiscovered = count
+			cachedNetStats, e = json.Marshal(netStats)
+			if e == nil {
+				_ = bcastNetstats.Send(cachedNetStats)
+			}
+			l.Println("done updating reserved peers")
+		}
+		findPeers()
+		tick := time.NewTicker(pollDiscovered * time.Minute)
+		for {
+			select {
+			case <-tick.C:
+				findPeers()
+			//case <-closeDb:
+			//	_ = missed.GeoDb.Close()
+			}
+		}
+	}()
+
 	ready = true
 	logmod = 10
 	l.Println("cache populated, starting server.")
-
 	go func() {
 		tick := time.NewTicker(2 * time.Second)
 		for {
@@ -280,63 +428,44 @@ func main() {
 
 	var upgrader = websocket.Upgrader{}
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
-	http.HandleFunc("/missed/ws", func(writer http.ResponseWriter, request *http.Request) {
+
+	broadcaster := func(writer http.ResponseWriter, request *http.Request, b *broadcast.Broadcaster) {
 		c, err := upgrader.Upgrade(writer, request, nil)
 		if err != nil {
 			l.Print("upgrade:", err)
 			return
 		}
 		defer c.Close()
-		sub := bcastMissed.Listen()
+		sub := b.Listen()
 		defer sub.Discard()
-		for b := range sub.Channel() {
-			if e := c.WriteMessage(websocket.TextMessage, b.([]byte)); e != nil {
+		for message := range sub.Channel() {
+			if e := c.WriteMessage(websocket.TextMessage, message.([]byte)); e != nil {
 				l.Println(request.RemoteAddr, e)
 				return
 			}
 		}
-	})
+	}
 
-	http.HandleFunc("/top/ws", func(writer http.ResponseWriter, request *http.Request) {
-		c, err := upgrader.Upgrade(writer, request, nil)
-		if err != nil {
-			l.Print("upgrade:", err)
-			return
-		}
-		defer c.Close()
-		sub := bcastTop.Listen()
-		defer sub.Discard()
-		for b := range sub.Channel() {
-			if e := c.WriteMessage(websocket.TextMessage, b.([]byte)); e != nil {
-				l.Println(request.RemoteAddr, e)
-				return
-			}
-		}
-	})
-
-	http.HandleFunc("/chart/ws", func(writer http.ResponseWriter, request *http.Request) {
-		c, err := upgrader.Upgrade(writer, request, nil)
-		if err != nil {
-			l.Print("upgrade:", err)
-			return
-		}
-		defer c.Close()
-		sub := bcastChart.Listen()
-		defer sub.Discard()
-		for b := range sub.Channel() {
-			if e := c.WriteMessage(websocket.TextMessage, b.([]byte)); e != nil {
-				l.Println(request.RemoteAddr, e)
-				return
-			}
-		}
-	})
-
-	http.Handle("/js/", http.FileServer(http.FS(missed.Js)))
-	http.Handle("/img/", http.FileServer(http.FS(missed.Js)))
-	http.Handle("/css/", http.FileServer(http.FS(missed.Js)))
+	// Something very strange going on with http.FS ... if using switch below does not send mime types?
+	http.Handle("/js/", http.FileServer(http.FS(missed.StaticContent)))
+	http.Handle("/img/", http.FileServer(http.FS(missed.StaticContent)))
+	http.Handle("/css/", http.FileServer(http.FS(missed.StaticContent)))
 
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
+		case "/missed/ws":
+			broadcaster(writer, request, &bcastMissed)
+		case "/top/ws":
+			broadcaster(writer, request, &bcastTop)
+		case "/chart/ws":
+			broadcaster(writer, request, &bcastChart)
+		case "/map/ws":
+			broadcaster(writer, request, &bcastMap)
+		case "/net/ws":
+			broadcaster(writer, request, &bcastNetstats)
+		case "/net":
+			setJsonHeader(writer)
+			_, _ = writer.Write(cachedNetStats)
 		case "/chart":
 			setJsonHeader(writer)
 			_, _ = writer.Write(cachedChart)
@@ -349,6 +478,9 @@ func main() {
 		case "/params":
 			setJsonHeader(writer)
 			_, _ = writer.Write(cachedParams)
+		case "/map":
+			setJsonHeader(writer)
+			_, _ = writer.Write(cachedMap)
 		case "/block":
 			params := request.URL.Query()
 			if params["num"] == nil || len(params["num"]) != 1 {
@@ -376,6 +508,16 @@ func main() {
 			}
 			setJsonHeader(writer)
 			_, _ = writer.Write(j)
+		case "/network.html":
+			writer.Header().Set("Server", "cosmissed")
+			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+			// todo appropriate security headers.
+			_, _ = writer.Write(missed.NetHtml)
+		case "/missed.html":
+			writer.Header().Set("Server", "cosmissed")
+			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+			// todo appropriate security headers.
+			_, _ = writer.Write(missed.MissedHtml)
 		case "/", "/index.html":
 			writer.Header().Set("Server", "cosmissed")
 			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
