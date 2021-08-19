@@ -17,6 +17,19 @@ async function getGeo() {
             wsProto = "wss://"
         }
 
+        const netInfo = await fetch("/net", {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-cache',
+            credentials: 'same-origin',
+            redirect: 'error',
+            referrerPolicy: 'no-referrer'
+        });
+        const netParams = await netInfo.json()
+        document.getElementById('totalNodes').innerHTML = netParams.peers_discovered
+        document.getElementById('rpcNodes').innerHTML = netParams.rpc_discovered
+        document.getElementById('lastUpdate').innerHTML = netParams.last_updated
+
         const response = await fetch("/map", {
             method: 'GET',
             mode: 'cors',
