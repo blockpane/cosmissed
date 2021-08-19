@@ -4,76 +4,57 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Monitor</title>
-  <link rel="stylesheet" href="css/bootstrap.min.css">
-  <script src="js/echarts.min.js"></script>
+  <link rel="stylesheet" href="/css/bootstrap.min.css">
+  <script src="/js/echarts.min.js"></script>
+  <script src="/js/echarts-gl.min.js"></script>
   <link rel="icon" href="/img/favicon.png">
 </head>
-<body onload="init()">
-<div class="container-xl border-bottom border-info" style="padding-top: 20px">
+<body onload="showSummary()">
+<div class="container-xl border-bottom border-info" style="padding-top: 20px;">
   <div class="row" style="padding-bottom: 10px;">
     <div class="col-4">
       <h3><span id="networkId" class="text-capitalize"></span> Monitor</h3>
     </div>
     <div class="col-4 d-flex justify-content-center btn-group btn-group-sm">
-      <a href="/"><button class="btn btn-info">Missed Blocks</button></a>
+      <a href="/"><button class="btn btn-info">Overview</button></a>
+      <a href="/missed.html"><button class="btn btn-secondary">Missed Blocks</button></a>
       <a href="/network.html"><button class="btn btn-secondary">Network</button></a>
     </div>
   </div>
   <div class="row">
     <div class="col-12">
       <div class="row text-center">
-        <div class="col-4">Data for last <span id="timeframe"></span> blocks</div>
-        <div class="col-4">Latest block is <span id="headblock" class="fw-bold"></span></div>
-        <div class="col-4">+<span id="seconds" class="fw-bold"></span> seconds</div>
+        <div class="col-3">Discovered Nodes: <span id="totalNodes" class="fw-bold"></span></div>
+        <div class="col-6">RPC Sources: <span id="rpcNodes" class="fw-bold"></span></div>
+        <div class="col-3"><span class="invisible" id="lastUpdate"></span></div>
+      </div>
+      <div class="row text-center">
+        <div class="col-3"><span id="missingNow">⚠</span> Validators Missing</div>
+        <div class="col-6">Latest block is <span id="headblock" class="fw-bold">⚠</span> proposed by <span id="proposedBy">⚠</span></div>
+        <div class="col-3">+<span id="seconds" class="fw-bold">⚠</span> seconds</div>
       </div>
     </div>
     <div>&nbsp;
     </div>
   </div>
 </div>
-<div class="container-xl" style="padding-top: 20px;">
+<div class="container-xl" style=" padding-top: 20px;">
+  <div class="row text-center"><h3>Node Locations</h3></div>
   <div class="row">
-    <div class="col-12" style="padding-right: 0;">
-        <div class="row justify-content-center">
-          <div class="col-12" id="main" style="height: 500px"></div>
-        </div>
-      <div class="row text-md-center" style="padding-top: 10px;">
-        <div class="col-2">
-          <div class="h5" id="missingWhen">Loading Missing ...</div>
-          <div class="text-start fw-bold fs-6">
-            <ol id="missing"></ol>
-          </div>
-        </div>
-        <div class="col-8">
-          <div class="row" style="padding-bottom: 0;">
-            <h5 align="center">
-              % Missed | Consensus %
-            </h5>
-          </div>
-          <div class="row" id="bottom" style="padding-bottom: 0;"></div>
-        </div>
-        <div class="col-2">
-          <div class="h5" id="currentJailed">Loading Jailed ...</div>
-          <div class="text-start fw-bold fs-6">
-            <ol id="jailed"></ol>
-          </div>.
-        </div>
-      </div>
-    </div>
+    <div class="col-6" id="sunburst" style="height: 600px;"></div>
+    <div class="col-6" id="cities" style="height: 600px;"></div>
   </div>
-  <div class="row">
+  <div class="row" style="padding-top: 30px;">
     <p align="center">
       <a href="https://blockpane.com"><img src="img/bp-logo-text.svg" height="30" alt="© 2021 Block Pane LLC."></a>&nbsp;
       <a href="https://github.com/blockpane/cosmissed"><img src="img/GitHub-Mark.png" height="30"></a>
     </p>
   </div>
 </div>
-<script src="js/chart.js"></script>
-<script src="js/top.js"></script>
+<script src="js/summary.js"></script>
 <script type="text/javascript">
-    function init(){
-        query();
-        topMissed();
+    function showSummary(){
+        chainInfo()
     }
 </script>
 

@@ -1,65 +1,160 @@
 package missed
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/oschwald/geoip2-golang"
+	sync "github.com/sasha-s/go-deadlock"
+	"github.com/savaki/geoip2"
 	"net"
+	"time"
 )
 
-type GeoLightErr struct{}
-
-func (g GeoLightErr) Error() string {
-	return "geolight database not loaded"
+var MMCache = &GeoCache{
+	Nodes: make(map[string]*GeoNode),
 }
 
-func getLatLong(ipAddr string) (float32, float32, error) {
-	if GeoDb == nil {
-		return 0, 0, GeoLightErr{}
+type NoGeoKeyError struct{}
+func (n NoGeoKeyError) Error() string {
+	return "maxmind user or key not set"
+}
+
+type GeoNode struct {
+	City string `json:"city"`
+	Country string `json:"country"`
+	Provider string `json:"provider"`
+	LatLong point `json:"lat_long"`
+}
+
+type GeoCache struct {
+	mux sync.Mutex
+	Nodes map[string]*GeoNode
+
+	id string
+	key string
+}
+
+func (g *GeoCache) SetAuth(u, k string) bool {
+	if u == "" || k == "" {
+		return false
 	}
+	g.key = k
+	g.id = u
+	return true
+}
+
+func (g *GeoCache) hasAuth() bool {
+	if g.key == "" || g.id == "" {
+		return false
+	}
+	return true
+}
+
+func (g *GeoCache) Get(s string) *GeoNode {
+	if !g.hasAuth() {
+		return nil
+	}
+	g.mux.Lock()
+	defer g.mux.Unlock()
+	return g.Nodes[s]
+}
+
+func (g *GeoCache) set(ip string, node *GeoNode) bool {
+	if !g.hasAuth() {
+		return false
+	}
+	if node == nil || ip == "" {
+		return false
+	}
+	g.mux.Lock()
+	g.Nodes[ip] = node
+	g.mux.Unlock()
+	return true
+}
+
+func (g *GeoCache) Fetch(ip net.IP) (*GeoNode, error) {
+	if !g.hasAuth() {
+		return nil, NoGeoKeyError{}
+	}
+	if ip == nil || ip.String() == "" {
+		return nil, errors.New("bad ip")
+	}
+	n := g.Get(ip.String())
+	if n != nil {
+		return n, nil
+	}
+	api := geoip2.New(g.id, g.key)
+	ctx, cancel := context.WithTimeout(context.Background(), 2 * time.Second)
+	defer cancel()
+	resp, err := api.City(ctx, ip.String())
+	if err != nil {
+		return nil, err
+	}
+	gn := &GeoNode{
+		City:     resp.City.Names["en"],
+		Country:  resp.Country.IsoCode,
+		Provider: resp.Traits.Isp,
+		LatLong:  point{float32(resp.Location.Latitude), float32(resp.Location.Longitude)},
+	}
+	switch "" {
+	case gn.Country:
+		gn.Country = "Unknown"
+		fallthrough
+	case gn.City:
+		gn.City = "Unknown"
+		fallthrough
+	case gn.Provider:
+		gn.Provider = "Unknown"
+	}
+	// annoying.
+	if gn.Provider == "Digital Ocean" {
+		gn.Provider = "DigitalOcean"
+	}
+	switch float32(0) {
+	case gn.LatLong[0], gn.LatLong[1]:
+		return nil, errors.New("could not resolve location")
+	default:
+		if !g.set(ip.String(), gn) {
+			return nil, errors.New("could not store geo node")
+		}
+	}
+	return gn, nil
+}
+
+
+
+func (g *GeoCache) getLatLong(ipAddr string) (float32, float32, error) {
 	ip := net.ParseIP(ipAddr)
 	if ip.String() != ipAddr || IsPrivate(ip) {
 		return 0, 0, fmt.Errorf("ip %s is invalid for geo lookup", ipAddr)
 	}
-	record, err := GeoDb.City(ip)
-	if err != nil {
-		return 0, 0, err
+	gn, e := g.Fetch(net.ParseIP(ipAddr))
+	if e != nil {
+		return 0,0,e
 	}
-	return float32(record.Location.Latitude), float32(record.Location.Longitude), err
+	if gn == nil {
+		return 0,0, errors.New("could not get lat long from cache")
+	}
+	return gn.LatLong[0], gn.LatLong[1], nil
 }
 
-func getLocation(ipAddr string) (cityName, country, provider string, latLong point, err error) {
-	if GeoDb == nil {
-		err = GeoLightErr{}
-		return
-	}
+func (g *GeoCache) getLocation(ipAddr string) (cityName, country, provider string, latLong point, err error) {
 	ip := net.ParseIP(ipAddr)
 	if ip == nil || IsPrivate(ip) {
 		err = fmt.Errorf("%s is not valid for geo lookup")
 		return
 	}
-	city := &geoip2.City{}
-	city, err = GeoDb.City(ip)
-
+	var gn *GeoNode
+	gn, err = g.Fetch(net.ParseIP(ipAddr))
 	if err != nil {
 		return
 	}
-	cityName = city.City.Names["en"]
-	if cityName == "" {
-		cityName = "Unknown"
+	if gn == nil {
+		err = errors.New("empty result for getLocation")
+		return
 	}
-	isp, _ := GeoDb.ISP(ip)
-	if isp == nil || isp.AutonomousSystemOrganization == "" {
-		provider = "Unknown"
-	} else {
-		provider = isp.AutonomousSystemOrganization
-	}
-	country = city.Country.IsoCode
-	if country == "" {
-		country = "Unknown"
-	}
-	return cityName, country, provider, point{float32(city.Location.Latitude), float32(city.Location.Longitude)}, err
+	return gn.City, gn.Country, gn.Provider, gn.LatLong, err
 }
 
 type PeerSet struct {

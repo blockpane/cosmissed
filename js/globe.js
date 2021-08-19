@@ -1,5 +1,6 @@
 async function getGeo() {
     try {
+
         const resp = await fetch("/params", {
             method: 'GET',
             mode: 'cors',
@@ -11,22 +12,10 @@ async function getGeo() {
         const params = await resp.json()
         document.getElementById('networkId').innerHTML = params.chain
 
-        const netInfo = await fetch("/net", {
-            method: 'GET',
-            mode: 'cors',
-            cache: 'no-cache',
-            credentials: 'same-origin',
-            redirect: 'error',
-            referrerPolicy: 'no-referrer'
-        });
-        const netParams = await netInfo.json()
-        document.getElementById('totalNodes').innerHTML = netParams.peers_discovered
-        document.getElementById('rpcNodes').innerHTML = netParams.rpc_discovered
-        let lupd = netParams.last_updated
-        if (lupd === '0001-01-01T00:00:00Z') {
-            lupd = 'Please standby, updating peers can take up to 5 minutes.'
+        let wsProto = "ws://"
+        if (location.protocol === "https:") {
+            wsProto = "wss://"
         }
-        document.getElementById('lastUpdate').innerHTML = lupd
 
         const response = await fetch("/map", {
             method: 'GET',
@@ -88,68 +77,6 @@ async function getGeo() {
 
         option && globeChart.setOption(option);
 
-        const sunDom = document.getElementById('sunburst');
-        const sunChart = echarts.init(sunDom);
-
-        let sunOption;
-        sunOption = {
-            textStyle: {
-                color: 'rgba(255, 255, 255, 0.7)'
-            },
-            backgroundColor: 'rgba(255, 255, 255, 0.0)',
-            title: {
-                text: 'City in Top 5 Countries',
-                left: 'center'
-            },
-            visualMap: {
-                type: 'continuous',
-                min: 0,
-                max: 10,
-                inRange: {
-                    //color: ['rgb(89,71,190)', '#537b13', '#ceaf24', 'rgb(232,133,31)']
-                    color: ['rgb(94,39,0)', 'rgb(255,138,22)']
-                },
-            },
-            tooltip: {
-                trigger: 'item'
-            },
-            series: {
-                type: 'sunburst',
-                data: netParams.sunburst.slice(0,5),
-                radius: [0, '90%'],
-                //label: {
-                //    rotate: 'radial'
-                //}
-                emphasis: {
-                    focus: 'ancestor'
-                },
-
-                levels: [{},{
-                        r0: '0',
-                        r: '25%',
-                        itemStyle: {
-                            borderWidth: 1
-                        },
-                        label: {
-                            rotate: 'tangential'
-                        }
-                    }, {
-                        r0: '25%',
-                        r: '75%',
-                        label: {
-                            align: 'left'
-                        }
-                    },
-                ],
-            },
-
-        };
-        sunOption && sunChart.setOption(sunOption);
-
-        let wsProto = "ws://"
-        if (location.protocol === "https:") {
-            wsProto = "wss://"
-        }
         function connectGlobe() {
             const socket = new WebSocket(wsProto + location.host + '/map/ws');
             socket.addEventListener('message', function (event) {
@@ -172,13 +99,7 @@ async function getGeo() {
                 const updNet = JSON.parse(event.data);
                 document.getElementById('totalNodes').innerHTML = updNet.peers_discovered
                 document.getElementById('rpcNodes').innerHTML = updNet.rpc_discovered
-                let lupd = updNet.last_updated
-                if (lupd === '0001-01-01T00:00:00Z') {
-                    lupd = 'Please standby, updating peers can take up to 5 minutes.'
-                }
-                document.getElementById('lastUpdate').innerHTML = lupd
-                sunOption.series.data = updNet.sunburst.slice(0,5);
-                sunChart.setOption(sunOption);
+                document.getElementById('lastUpdate').innerHTML = updNet.last_updated
             });
             socket.onclose = function(e) {
                 console.log('Socket is closed, retrying /net/ws ...', e.reason);
@@ -188,9 +109,8 @@ async function getGeo() {
             };
         }
         connectNet()
-
     }
     catch (e) {
-        console.log(e)
+    console.log(e)
     }
 }

@@ -48,7 +48,7 @@ async function query() {
                     backgroundColor: 'rgba(104,104,104,0.22)',
                     dataBackground: {
                         lineStyle: {
-                            color: '#000',
+                            color: '#333',
                             width: 2,
                         }
                     }
@@ -80,7 +80,7 @@ async function query() {
                     data: data.blocks,
                     position: 'top',
                     axisLabel: {
-                        color: '#000',
+                        color: '#fff',
                         verticalAlign: 'bottom',
                     },
                 }

@@ -36,6 +36,7 @@ type savedState struct {
 	Discovered   *missed.Discovered
 	PeerMap      missed.PeerMap
 	Successful   int
+	GeoCache     *missed.GeoCache
 }
 
 func main() {
@@ -43,7 +44,7 @@ func main() {
 
 	var (
 		current, successful, track, listen                                          int
-		cosmosApi, tendermintApi, prefix, networkName, socket, cacheFile, xRpcHosts string
+		cosmosApi, tendermintApi, prefix, networkName, socket, cacheFile, xRpcHosts, user, apiKey string
 		ready, stdout                                                               bool
 	)
 
@@ -53,11 +54,18 @@ func main() {
 	flag.StringVar(&socket, "socket", "", "filename for unix socket to listen on, if set will disable TCP listener")
 	flag.StringVar(&cacheFile, "cache", "cosmissed.dat", "filename for caching previous blocks")
 	flag.StringVar(&xRpcHosts, "extra-rpc", "", "extra tendermint RPC endpoints to poll for peer info, comma seperated list of URLs")
+	flag.StringVar(&user, "user", "", "Required: Username for GeoIP2 Precision Web Service")
+	flag.StringVar(&apiKey, "key", "", "Required: Key for GeoIP2 Precision Web Service")
 	flag.IntVar(&listen, "l", 8080, "webserver port to listen on")
 	flag.IntVar(&track, "n", 3000, "most recent blocks to track")
 	flag.BoolVar(&stdout, "v", false, "log new records to stdout (error logs already on stderr)")
 
 	flag.Parse()
+
+	if user == "" || apiKey == "" {
+		l.Fatal("the '-user' and '-key' options are required")
+	}
+
 
 	switch {
 	case strings.HasPrefix(cosmosApi, "unix://"):
@@ -103,14 +111,14 @@ func main() {
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	closeDb := make(chan interface{})
+	//closeDb := make(chan interface{})
 
 	go func() {
 		sig := <-sigs
-		if missed.GeoDb != nil {
-			// prevent race using channel to close
-			close(closeDb)
-		}
+		//if missed.GeoDb != nil {
+		//	// prevent race using channel to close
+		//	close(closeDb)
+		//}
 		if socket != "" {
 			os.Remove(socket)
 		}
@@ -131,6 +139,7 @@ func main() {
 			PeerMap:      pm,
 			Discovered:   discovered,
 			Successful:   successful,
+			GeoCache:     missed.MMCache,
 		}
 		e = out.Encode(ss)
 		if e != nil {
@@ -284,8 +293,15 @@ func main() {
 		pm = state.PeerMap
 		discovered = state.Discovered
 		successful = state.Successful
+		missed.MMCache = state.GeoCache
+		if !missed.MMCache.SetAuth(user, apiKey) {
+			l.Fatal("could not set maxmind credentials")
+		}
 		return true
 	}() {
+		if !missed.MMCache.SetAuth(user, apiKey) {
+			l.Fatal("could not set maxmind credentials")
+		}
 		results = make([]*missed.Summary, track)
 		successful = current - track - lagBlocks - 1
 		l.Printf("fetching last %d blocks, please wait\n", track)
@@ -382,8 +398,8 @@ func main() {
 			select {
 			case <-tick.C:
 				//findPeers()
-			case <-closeDb:
-				_ = missed.GeoDb.Close()
+			//case <-closeDb:
+			//	_ = missed.GeoDb.Close()
 			}
 		}
 	}()
@@ -497,6 +513,11 @@ func main() {
 			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 			// todo appropriate security headers.
 			_, _ = writer.Write(missed.NetHtml)
+		case "/missed.html":
+			writer.Header().Set("Server", "cosmissed")
+			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+			// todo appropriate security headers.
+			_, _ = writer.Write(missed.MissedHtml)
 		case "/", "/index.html":
 			writer.Header().Set("Server", "cosmissed")
 			writer.Header().Set("Content-Type", "text/html; charset=utf-8")

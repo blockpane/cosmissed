@@ -3,7 +3,6 @@ package missed
 import (
 	"embed"
 	"github.com/microcosm-cc/bluemonday"
-	"github.com/oschwald/geoip2-golang"
 	"log"
 	"mime"
 	"net/http"
@@ -16,6 +15,9 @@ var IndexHtml []byte
 //go:embed network.html
 var NetHtml []byte
 
+//go:embed missed.html
+var MissedHtml []byte
+
 //go:embed js/* img/* css/*
 var StaticContent embed.FS
 
@@ -26,7 +28,7 @@ var (
 	NetworkId string
 	CUrl      string
 	TUrl      string
-	GeoDb     *geoip2.Reader
+	//GeoDb     *geoip2.Reader
 	l         *log.Logger
 	peerMap   PeerMap
 )
@@ -37,12 +39,12 @@ func init() {
 	_ = mime.AddExtensionType(".js", "application/javascript")
 	_ = mime.AddExtensionType(".css", "text/css")
 
-	var err error
-	//FIXME: set flag for file location
-	GeoDb, err = geoip2.Open("GeoLite2-City.mmdb")
-	if err != nil {
-		l.Println("error opening GeoLite2-City.mmdb, geoip features disabled:", err.Error())
-	}
+	//var err error
+	////FIXME: set flag for file location
+	//GeoDb, err = geoip2.Open("GeoLite2-City.mmdb")
+	//if err != nil {
+	//	l.Println("error opening GeoLite2-City.mmdb, geoip features disabled:", err.Error())
+	//}
 
 	peerMap = make([]PeerSet, 0)
 

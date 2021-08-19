@@ -128,7 +128,7 @@ func NewDiscovered() *Discovered {
 	}
 }
 
-func (d Discovered) Skip(s string) bool {
+func (d *Discovered) Skip(s string) bool {
 	d.mux.RLock()
 	defer d.mux.RUnlock()
 	if d.Nodes[s] == nil || d.Nodes[s].Skip == true {
@@ -273,7 +273,7 @@ func NetworkSummary(d *Discovered, p PeerMap) NetworkStats {
 			increment(nodeLocCache[k].Country, countryFound)
 			continue
 		}
-		city, country, isp, latlong, err := getLocation(k)
+		city, country, isp, latlong, err := MMCache.getLocation(k)
 		if err != nil {
 			continue
 		}
@@ -294,7 +294,7 @@ func NetworkSummary(d *Discovered, p PeerMap) NetworkStats {
 		}
 		ispList[isp][country][city] += 1
 	}
-	//delete(ispList, "Unknown")
+	delete(ispList, "Unknown")
 	for ispName, countryMap := range ispList {
 		var ispCounter int
 		iBurst := Sunburst{
@@ -321,6 +321,9 @@ func NetworkSummary(d *Discovered, p PeerMap) NetworkStats {
 		iBurst.Value = ispCounter
 		ns.Providers = append(ns.Providers, iBurst)
 	}
+	sort.Slice(ns.Providers, func(i, j int) bool {
+		return ns.Providers[i].Value > ns.Providers[j].Value
+	})
 	cities := make([]locationCounts, 0)
 	countries := make([]locationCounts, 0)
 	for k, v := range cityFound {

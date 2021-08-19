@@ -152,9 +152,9 @@ var cacheMux = sync.Mutex{}
 // GetNeighbors calls the RCP endpoint asking for neighbors.
 func GetNeighbors(node string) (source string, peers PeerSet, e error) {
 	empty := PeerSet{}
-	if GeoDb == nil {
-		return "", empty, errors.New("no geoip database is loaded, skipping peer discovery")
-	}
+	//if GeoDb == nil {
+	//	return "", empty, errors.New("no geoip database is loaded, skipping peer discovery")
+	//}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	var client = TClient
@@ -190,7 +190,7 @@ func GetNeighbors(node string) (source string, peers PeerSet, e error) {
 	cacheMux.Lock()
 	LongLat := cachedPoints[listenerIp]
 	if LongLat[0] == 0 {
-		long, lat, e = getLatLong(listenerIp)
+		long, lat, e = MMCache.getLatLong(listenerIp)
 		if e != nil {
 			return "", empty, e
 		}
@@ -209,7 +209,7 @@ func GetNeighbors(node string) (source string, peers PeerSet, e error) {
 		ll := cachedPoints[p.RemoteIp]
 		cacheMux.Unlock()
 		if ll[0] == 0 {
-			long, lat, e = getLatLong(p.RemoteIp)
+			long, lat, e = MMCache.getLatLong(p.RemoteIp)
 			if e != nil {
 				continue
 			}
