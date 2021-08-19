@@ -65,7 +65,7 @@ async function chainInfo() {
             },
             backgroundColor: 'rgba(255, 255, 255, 0.0)',
             title: {
-                text: 'Top 10 Node Countries',
+                text: 'Countries',
                 left: 'center'
             },
             visualMap: {
@@ -121,7 +121,7 @@ async function chainInfo() {
             },
             backgroundColor: 'rgba(255, 255, 255, 0.0)',
             title: {
-                text: 'Top 10 Hosting Providers',
+                text: 'Hosting Providers',
                 left: 'center'
             },
             visualMap: {

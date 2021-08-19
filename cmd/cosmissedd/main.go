@@ -397,7 +397,7 @@ func main() {
 		for {
 			select {
 			case <-tick.C:
-				//findPeers()
+				findPeers()
 			//case <-closeDb:
 			//	_ = missed.GeoDb.Close()
 			}
