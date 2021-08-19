@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-const evictDuration = 1 * time.Hour
+const evictDuration = 14 * 24 * time.Hour
 
 // MinNeighbor is a stripped down response from the API with only a moniker and IP
 type MinNeighbor struct {
