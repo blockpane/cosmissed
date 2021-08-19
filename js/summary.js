@@ -82,7 +82,7 @@ async function chainInfo() {
             },
             series: {
                 type: 'sunburst',
-                data: netParams.sunburst.slice(0, 100),
+                data: netParams.sunburst.slice(0, 50),
                 radius: [0, '90%'],
                 emphasis: {
                     focus: 'ancestor'
@@ -138,7 +138,7 @@ async function chainInfo() {
             },
             series: {
                 type: 'sunburst',
-                data: netParams.providers.slice(0, 100),
+                data: netParams.providers.slice(0, 50),
                 radius: [0, '90%'],
                 emphasis: {
                     focus: 'ancestor'
@@ -185,8 +185,10 @@ async function chainInfo() {
                     lupd = 'Please standby, updating peers can take up to 5 minutes.'
                 }
                 document.getElementById('lastUpdate').innerHTML = lupd
-                sunOption.series.data = updNet.providers.slice(0,10);
+                sunOption.series.data = updNet.providers.slice(0,50);
                 sunChart.setOption(sunOption);
+                locOption.series.data = updNet.sunburst.slice(0,50);
+                locChart.setOption(locOption);
             });
             socket.onclose = function(e) {
                 console.log('Socket is closed, retrying /net/ws ...', e.reason);
