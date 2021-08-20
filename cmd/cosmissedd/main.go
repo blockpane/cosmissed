@@ -98,6 +98,9 @@ func main() {
 		missed.TUrl = tendermintApi
 	}
 
+	gCtx, gCancel := context.WithCancel(context.Background())
+	defer gCancel()
+
 	cachedResult := []byte("{}")
 	cachedTop := []byte("{}")
 	cachedChart := []byte("{}")
@@ -119,6 +122,7 @@ func main() {
 		//	// prevent race using channel to close
 		//	close(closeDb)
 		//}
+		gCancel()
 		if socket != "" {
 			os.Remove(socket)
 		}
@@ -148,13 +152,25 @@ func main() {
 		l.Fatal("exiting")
 	}()
 
-	var bcastMissed, bcastTop, bcastChart, bcastMap, bcastNetstats broadcast.Broadcaster
+	var bcastMissed, bcastTop, bcastChart, bcastMap, bcastNetstats, bcastMpool broadcast.Broadcaster
 	defer func() {
 		bcastMissed.Discard()
 		bcastTop.Discard()
 		bcastTop.Discard()
 		bcastMap.Discard()
 		bcastNetstats.Discard()
+		bcastMpool.Discard()
+	}()
+
+	// membpool stats:
+	go func() {
+		memTx := make(chan []byte)
+		go missed.WatchUnconfirmed(gCtx,memTx, missed.TClient, missed.TUrl)
+		for mtx := range memTx {
+			if e := bcastMpool.Send(mtx); e != nil {
+				l.Println("bcastMpool:", e)
+			}
+		}
 	}()
 
 	// Additional tendermint RPC endpoints to poll for net_info
@@ -453,6 +469,7 @@ func main() {
 
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
+		// sockets
 		case "/missed/ws":
 			broadcaster(writer, request, &bcastMissed)
 		case "/top/ws":
@@ -463,6 +480,13 @@ func main() {
 			broadcaster(writer, request, &bcastMap)
 		case "/net/ws":
 			broadcaster(writer, request, &bcastNetstats)
+		case "/mem/ws":
+			broadcaster(writer, request, &bcastMpool)
+
+		// cached rest
+		case "/mem":
+			setJsonHeader(writer)
+			_, _ = writer.Write(missed.UnconfirmedCache)
 		case "/net":
 			setJsonHeader(writer)
 			_, _ = writer.Write(cachedNetStats)
@@ -481,6 +505,7 @@ func main() {
 		case "/map":
 			setJsonHeader(writer)
 			_, _ = writer.Write(cachedMap)
+
 		case "/block":
 			params := request.URL.Query()
 			if params["num"] == nil || len(params["num"]) != 1 {
@@ -508,6 +533,8 @@ func main() {
 			}
 			setJsonHeader(writer)
 			_, _ = writer.Write(j)
+
+		// static
 		case "/network.html":
 			writer.Header().Set("Server", "cosmissed")
 			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
