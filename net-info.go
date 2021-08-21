@@ -237,6 +237,7 @@ type NodeLocation struct {
 }
 
 var nodeLocCache = make(map[string]*NodeLocation)
+var ispList = make(map[string]map[string]map[string]int)
 
 func NetworkSummary(d *Discovered, p PeerMap) NetworkStats {
 	if d == nil {
@@ -263,7 +264,6 @@ func NetworkSummary(d *Discovered, p PeerMap) NetworkStats {
 	}
 	cityFound := make(map[string]int)
 	countryFound := make(map[string]int)
-	ispList := make(map[string]map[string]map[string]int)
 	increment := func(s string, w map[string]int) {
 		w[s] += 1
 	}
