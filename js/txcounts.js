@@ -130,7 +130,7 @@ async function txCounts() {
                     borderColor: 'rgb(238,223,208)',
                     borderWidth: 0.2,
                     shadowBlur: 15,
-                    shadowColor: 'rgba(255, 255, 255, 0.9)',
+                    shadowColor: 'rgba(255, 255, 255, 0.5)',
                 },
                 label: {
                     show: false,
@@ -146,6 +146,13 @@ async function txCounts() {
         wsProto = "wss://"
     }
 
+    let lastTxCount = 0;
+    let lastMemCount = 0;
+
+    const down = '<span class="text-success">↓ </span>';
+    const up = '<span class="text-warning">↑ </span>';
+    const same = "&nbsp; &nbsp; "
+
     function connectMem() {
         const socket = new WebSocket(wsProto + location.host + '/mem/ws');
         socket.addEventListener('message', function (event) {
@@ -155,10 +162,29 @@ async function txCounts() {
                 pool.push(mp);
                 blocks.shift();
                 blocks.push([mp[0],0,"Confirmed Tx"]);
-                document.getElementById('pendingTx').innerHTML = mp[1]
+                document.getElementById('lastTx').innerHTML = same + lastTxCount
+                if (mp[1] > lastMemCount) {
+                    document.getElementById('pendingTx').innerHTML = up+mp[1]
+                    lastMemCount = mp[1];
+                } else if (mp[1] < lastMemCount) {
+                    document.getElementById('pendingTx').innerHTML = down+mp[1]
+                    lastMemCount = mp[1];
+                } else {
+                    document.getElementById('pendingTx').innerHTML = same+mp[1]
+                    lastMemCount = mp[1];
+                }
             } else {
                 blocks[blocks.length -1] = mp;
-                document.getElementById('lastTx').innerHTML = mp[1]
+                if (mp[1] > lastTxCount) {
+                    document.getElementById('lastTx').innerHTML = up+mp[1]
+                    lastTxCount = mp[1];
+                } else if (mp[1] < lastTxCount) {
+                    document.getElementById('lastTx').innerHTML = down+mp[1]
+                    lastTxCount = mp[1];
+                } else {
+                    document.getElementById('lastTx').innerHTML = same+mp[1]
+                    lastTxCount = mp[1];
+                }
             }
             const d = new Date();
             if ((d.getTime() / 1000) % 6 < 1) {

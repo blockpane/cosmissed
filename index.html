@@ -41,9 +41,17 @@
 <div class="container-xl" style=" padding-top: 20px;">
   <div class="row">
     <div class="col-10" style="height: 180px;" id="mempool"></div>
-    <div class="col-2 text-sm-center fw-lighter">
-      <p>Pending: <span id="pendingTx">?</span><br/></p>
-      <p>Last: <span id="lastTx">?</span></p>
+    <div class="col-2 text-sm-end fw-lighter">
+      <div class="row">&nbsp;</div>
+      <div class="row">
+        <div class="row">
+          <div class="col text-end"><br/>Pending:</div><div class="col fw-bold text-start"><br/><span id="pendingTx">&nbsp;</span></div>
+        </div>
+        <div class="row">
+          <div class="col text-end">Last:</div><div class=" col fw-bold text-start" id="lastTx">&nbsp;</div>
+        </div>
+      </div>
+      <div class="row">&nbsp;</div>
     </div>
   </div>
   <div class="row text-center"><h3>Node Locations</h3></div>

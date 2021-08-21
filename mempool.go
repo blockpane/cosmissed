@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const trackUnconfirmed = 600 // length of ringbuffer for tracking mempool. TODO: rethink this approach
+const trackUnconfirmed = 900 // length of ringbuffer for tracking mempool. TODO: rethink this approach
 
 
 
