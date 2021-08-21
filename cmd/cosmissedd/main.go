@@ -43,9 +43,9 @@ func main() {
 	l := log.New(os.Stderr, "cosmissed | ", log.Lshortfile|log.LstdFlags)
 
 	var (
-		current, successful, track, listen                                          int
+		current, successful, track, listen                                                        int
 		cosmosApi, tendermintApi, prefix, networkName, socket, cacheFile, xRpcHosts, user, apiKey string
-		ready, stdout                                                               bool
+		ready, stdout, skipDisco                                                                  bool
 	)
 
 	flag.StringVar(&cosmosApi, "c", "http://127.0.0.1:1317", "cosmos http API endpoint")
@@ -59,10 +59,11 @@ func main() {
 	flag.IntVar(&listen, "l", 8080, "webserver port to listen on")
 	flag.IntVar(&track, "n", 3000, "most recent blocks to track")
 	flag.BoolVar(&stdout, "v", false, "log new records to stdout (error logs already on stderr)")
+	flag.BoolVar(&skipDisco, "no-discovery", false, "do not perform node discovery")
 
 	flag.Parse()
 
-	if user == "" || apiKey == "" {
+	if !skipDisco && (user == "" || apiKey == "") {
 		l.Fatal("the '-user' and '-key' options are required")
 	}
 
@@ -165,11 +166,12 @@ func main() {
 	// membpool stats:
 	go func() {
 		memTx := make(chan []byte)
-		go missed.WatchUnconfirmed(gCtx,memTx, missed.TClient, missed.TUrl)
+		go missed.WatchUnconfirmed(gCtx,memTx, missed.TClient, missed.TUrl, tendermintApi)
 		for mtx := range memTx {
-			if e := bcastMpool.Send(mtx); e != nil {
-				l.Println("bcastMpool:", e)
-			}
+			_ = bcastMpool.Send(mtx)
+			//if e := bcastMpool.Send(mtx); e != nil {
+			//	l.Println("bcastMpool:", e)
+			//}
 		}
 	}()
 
@@ -309,6 +311,9 @@ func main() {
 		pm = state.PeerMap
 		discovered = state.Discovered
 		successful = state.Successful
+		if successful < current - track - lagBlocks - 1 {
+			successful = current - track - lagBlocks - 1
+		}
 		missed.MMCache = state.GeoCache
 		if !missed.MMCache.SetAuth(user, apiKey) {
 			l.Fatal("could not set maxmind credentials")
@@ -341,6 +346,9 @@ func main() {
 		}
 		if pm == nil {
 			pm = make([]missed.PeerSet, 0)
+		}
+		if skipDisco {
+			return
 		}
 
 		var busy bool

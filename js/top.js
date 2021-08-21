@@ -65,20 +65,12 @@ async function topMissed() {
             legend: {
                 data: ['Missed %', "Vote Weight"]
             },
-            //grid: [{
-            //    width: "50%",
-            //    //left: '6%',
-            //    //right: '55%',
-            //    //bottom: '3%',
-            //    containLabel: true
-            //},
-            //{
-            //    width: "45%",
-            //    //left: '55%',
-            //    //right: '4%',
-            //    //bottom: '3%',
-            //    containLabel: true
-            //}],
+            grid: {
+                left: '6%',
+                right: '4%',
+                bottom: '3%',
+                containLabel: true
+            },
             xAxis: {
                 type: 'value',
                 inverse: true

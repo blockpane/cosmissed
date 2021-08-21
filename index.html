@@ -16,9 +16,9 @@
       <h3><span id="networkId" class="text-capitalize"></span> Monitor</h3>
     </div>
     <div class="col-4 d-flex justify-content-center btn-group btn-group-sm">
-      <a href="/"><button class="btn btn-info">Overview</button></a>
-      <a href="/missed.html"><button class="btn btn-secondary">Missed Blocks</button></a>
-      <a href="/network.html"><button class="btn btn-secondary">Network</button></a>
+      <a href="/"><button class="btn btn-info btn-sm">Overview</button></a>&nbsp;
+      <a href="/missed.html"><button class="btn btn-secondary btn-sm">Missed Blocks</button></a>&nbsp;
+      <a href="/network.html"><button class="btn btn-secondary btn-sm">Network</button></a>
     </div>
   </div>
   <div class="row">
@@ -39,6 +39,13 @@
   </div>
 </div>
 <div class="container-xl" style=" padding-top: 20px;">
+  <div class="row">
+    <div class="col-10" style="height: 180px;" id="mempool"></div>
+    <div class="col-2 text-sm-center fw-lighter d-flex align-items-center">
+      Pending: <span id="pendingTx">?</span><br/> &nbsp;
+      Last: <span id="lastTx">?</span>
+    </div>
+  </div>
   <div class="row text-center"><h3>Node Locations</h3></div>
   <div class="row">
     <div class="col-6" id="sunburst" style="height: 600px;"></div>
@@ -52,9 +59,11 @@
   </div>
 </div>
 <script src="js/summary.js"></script>
+<script src="js/txcounts.js"></script>
 <script type="text/javascript">
     function showSummary(){
-        chainInfo()
+        chainInfo();
+        txCounts();
     }
 </script>
 

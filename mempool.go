@@ -1,33 +1,56 @@
 package missed
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
+	"github.com/tendermint/tendermint/types"
 	"io"
 	"net/http"
 	"strconv"
 	"time"
 )
 
-const trackUnconfirmed = 3600 // length of ringbuffer for tracking mempool. TODO: rethink this approach
+const trackUnconfirmed = 600 // length of ringbuffer for tracking mempool. TODO: rethink this approach
 
-var UnconfirmedCache = []byte(`[]`)
-var unconfirmed = func() []*memPoolPoint {
+
+
+func mkTxPoint(scaling int) []*txCountPoint {
 	now := time.Now().UTC()
-	u := make([]*memPoolPoint, trackUnconfirmed)
-	for i := trackUnconfirmed - 1; i > 0; i-- {
-		u[i] = &memPoolPoint{
-			Time:    now.Add(time.Duration(-i) * time.Second),
+	u := make([]*txCountPoint, trackUnconfirmed/scaling)
+	for i := len(u) - 1; i > 0; i-- {
+		u[i] = &txCountPoint{
+			Time:    now.Add(time.Duration(-i*scaling) * time.Second),
 			Pending: 0,
 		}
 	}
 	return u
-}()
+}
 
-func WatchUnconfirmed(ctx context.Context, updates chan []byte, client *http.Client, baseUrl string) {
+var UnconfirmedCache = []byte(`[]`)
+var unconfirmed = mkTxPoint(1)
+var confirmed = mkTxPoint(1)
+
+
+func WatchUnconfirmed(ctx context.Context, updates chan []byte, client *http.Client, baseUrl, origApi string) {
 	failed := make(chan interface{})
-	points := make(chan *memPoolPoint)
+	points := make(chan *txCountPoint)
 	go streamMemPool(ctx, client, baseUrl, points, failed)
+
+	subClient, _ := rpchttp.New(origApi, "/websocket")
+	err := subClient.Start()
+	if err != nil {
+		l.Fatal(origApi, err)
+	}
+	defer subClient.Stop()
+	query := "tm.event = 'NewBlock'"
+	freshBlocks, err := subClient.Subscribe(ctx, "test-client", query)
+	if err != nil {
+		l.Fatal(origApi, err)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -36,24 +59,43 @@ func WatchUnconfirmed(ctx context.Context, updates chan []byte, client *http.Cli
 		case <-failed:
 			l.Println("WatchUnconfirmed() exiting: streamMemPool failed")
 			return
-		case p := <-points:
-			if j, _ := json.Marshal(p); j != nil {
-				updates <-j
+		case b := <-freshBlocks:
+			updates <-[]byte(fmt.Sprintf(`["%s",%d,"Confirmed Tx"]`,
+				b.Data.(types.EventDataNewBlock).Block.Time.Format(time.RFC3339),
+				len(b.Data.(types.EventDataNewBlock).Block.Txs),
+			))
+			confirmed[len(confirmed)-1] = &txCountPoint{
+				Time:    b.Data.(types.EventDataNewBlock).Block.Time,
+				Pending: len(b.Data.(types.EventDataNewBlock).Block.Txs),
 			}
+		case p := <-points:
+			updates <-[]byte(fmt.Sprintf(`["%s",%d,"Pending Tx"]`, p.Time.Format(time.RFC3339), p.Pending))
+			confirmed = append(confirmed[1:], &txCountPoint{
+				Time:    p.Time,
+				Pending: 0,
+			})
 			unconfirmed = append(unconfirmed[1:], p)
 			if time.Now().Second()%5 == 0 {
-				j, e := json.Marshal(unconfirmed)
-				if e != nil {
-					l.Println(e)
-					continue
+				buf := bytes.NewBufferString(`[[`)
+				prefix := ""
+				for i := range unconfirmed {
+					buf.WriteString(fmt.Sprintf(`%s["%s",%d,"Pending Tx"]`, prefix, unconfirmed[i].Time.UTC().Format(time.RFC3339), unconfirmed[i].Pending))
+					prefix = ","
 				}
-				UnconfirmedCache = j
+				buf.WriteString(`],[`)
+				prefix = ""
+				for i := range confirmed {
+					buf.WriteString(fmt.Sprintf(`%s["%s",%d,"Confirmed Tx"]`, prefix, confirmed[i].Time.UTC().Format(time.RFC3339), confirmed[i].Pending))
+					prefix = ","
+				}
+				buf.WriteString(`]]`)
+				UnconfirmedCache = buf.Bytes()
 			}
 		}
 	}
 }
 
-type memPoolPoint struct {
+type txCountPoint struct {
 	Time    time.Time `json:"time"`
 	Pending int       `json:"pending"`
 }
@@ -75,7 +117,7 @@ func (u *unconfirmResp) total() int {
 
 // streamMemPool sends the result from 'num_unconfirmed_txs' to a channel.
 // this is going to work a lot better with a unix socket since tcp gets expensive when polling.
-func streamMemPool(ctx context.Context, client *http.Client, baseUrl string, points chan *memPoolPoint, failed chan interface{}) {
+func streamMemPool(ctx context.Context, client *http.Client, baseUrl string, points chan *txCountPoint, failed chan interface{}) {
 	defer close(failed)
 	tick := time.NewTicker(time.Second)
 
@@ -97,7 +139,7 @@ func streamMemPool(ctx context.Context, client *http.Client, baseUrl string, poi
 				resp, err = client.Do(req)
 				if err != nil {
 					l.Println("refresh mempool length:", err)
-					points <- &memPoolPoint{
+					points <- &txCountPoint{
 						Time:    t,
 						Pending: 0,
 					}
@@ -106,7 +148,7 @@ func streamMemPool(ctx context.Context, client *http.Client, baseUrl string, poi
 				body, err = io.ReadAll(resp.Body)
 				if err != nil {
 					l.Println(err)
-					points <- &memPoolPoint{
+					points <- &txCountPoint{
 						Time:    t,
 						Pending: 0,
 					}
@@ -117,13 +159,13 @@ func streamMemPool(ctx context.Context, client *http.Client, baseUrl string, poi
 				err = json.Unmarshal(body, ucr)
 				if err != nil {
 					l.Println(err)
-					points <- &memPoolPoint{
+					points <- &txCountPoint{
 						Time:    t,
 						Pending: 0,
 					}
 					return
 				}
-				points <- &memPoolPoint{
+				points <- &txCountPoint{
 					Time:    t,
 					Pending: ucr.total(),
 				}
