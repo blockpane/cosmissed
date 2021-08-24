@@ -151,6 +151,9 @@ async function txCounts() {
 
     const down = '<span class="text-success">↓ </span>';
     const up = '<span class="text-warning">↑ </span>';
+    const lt = '<span class="text-warning">&lt; </span>';
+    const gt = '<span class="text-info">&gt; </span>';
+    const blockSame = '<span class="text-success">= </span>';
     const same = "&nbsp; &nbsp; "
 
     function connectMem() {
@@ -175,14 +178,14 @@ async function txCounts() {
                 }
             } else {
                 blocks[blocks.length -1] = mp;
-                if (mp[1] > lastTxCount) {
-                    document.getElementById('lastTx').innerHTML = up+mp[1]
+                if (mp[1] > lastMemCount) {
+                    document.getElementById('lastTx').innerHTML = gt+mp[1]
                     lastTxCount = mp[1];
-                } else if (mp[1] < lastTxCount) {
-                    document.getElementById('lastTx').innerHTML = down+mp[1]
+                } else if (mp[1] < lastMemCount) {
+                    document.getElementById('lastTx').innerHTML = lt+mp[1]
                     lastTxCount = mp[1];
                 } else {
-                    document.getElementById('lastTx').innerHTML = same+mp[1]
+                    document.getElementById('lastTx').innerHTML = blockSame+mp[1]
                     lastTxCount = mp[1];
                 }
             }
