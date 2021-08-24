@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	sync "github.com/sasha-s/go-deadlock"
 	"github.com/savaki/geoip2"
 	"net"
+	"sync"
 	"time"
 )
 
