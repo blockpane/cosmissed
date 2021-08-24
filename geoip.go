@@ -111,6 +111,9 @@ func (g *GeoCache) Fetch(ip net.IP) (*GeoNode, error) {
 	if gn.Provider == "Digital Ocean" {
 		gn.Provider = "DigitalOcean"
 	}
+	if len(gn.Provider) > 32 {
+		gn.Provider = gn.Provider[:29]+"..."
+	}
 	switch float32(0) {
 	case gn.LatLong[0], gn.LatLong[1]:
 		return nil, errors.New("could not resolve location")

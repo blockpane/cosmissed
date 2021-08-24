@@ -43,9 +43,9 @@ func main() {
 	l := log.New(os.Stderr, "cosmissed | ", log.Lshortfile|log.LstdFlags)
 
 	var (
-		current, successful, track, listen                                          int
+		current, successful, track, listen                                                        int
 		cosmosApi, tendermintApi, prefix, networkName, socket, cacheFile, xRpcHosts, user, apiKey string
-		ready, stdout                                                               bool
+		ready, stdout, skipDisco                                                                  bool
 	)
 
 	flag.StringVar(&cosmosApi, "c", "http://127.0.0.1:1317", "cosmos http API endpoint")
@@ -59,10 +59,11 @@ func main() {
 	flag.IntVar(&listen, "l", 8080, "webserver port to listen on")
 	flag.IntVar(&track, "n", 3000, "most recent blocks to track")
 	flag.BoolVar(&stdout, "v", false, "log new records to stdout (error logs already on stderr)")
+	flag.BoolVar(&skipDisco, "no-discovery", false, "do not perform node discovery")
 
 	flag.Parse()
 
-	if user == "" || apiKey == "" {
+	if !skipDisco && (user == "" || apiKey == "") {
 		l.Fatal("the '-user' and '-key' options are required")
 	}
 
@@ -98,6 +99,9 @@ func main() {
 		missed.TUrl = tendermintApi
 	}
 
+	gCtx, gCancel := context.WithCancel(context.Background())
+	defer gCancel()
+
 	cachedResult := []byte("{}")
 	cachedTop := []byte("{}")
 	cachedChart := []byte("{}")
@@ -119,6 +123,7 @@ func main() {
 		//	// prevent race using channel to close
 		//	close(closeDb)
 		//}
+		gCancel()
 		if socket != "" {
 			os.Remove(socket)
 		}
@@ -148,13 +153,26 @@ func main() {
 		l.Fatal("exiting")
 	}()
 
-	var bcastMissed, bcastTop, bcastChart, bcastMap, bcastNetstats broadcast.Broadcaster
+	var bcastMissed, bcastTop, bcastChart, bcastMap, bcastNetstats, bcastMpool broadcast.Broadcaster
 	defer func() {
 		bcastMissed.Discard()
 		bcastTop.Discard()
 		bcastTop.Discard()
 		bcastMap.Discard()
 		bcastNetstats.Discard()
+		bcastMpool.Discard()
+	}()
+
+	// membpool stats:
+	go func() {
+		memTx := make(chan []byte)
+		go missed.WatchUnconfirmed(gCtx,memTx, missed.TClient, missed.TUrl, tendermintApi)
+		for mtx := range memTx {
+			_ = bcastMpool.Send(mtx)
+			//if e := bcastMpool.Send(mtx); e != nil {
+			//	l.Println("bcastMpool:", e)
+			//}
+		}
 	}()
 
 	// Additional tendermint RPC endpoints to poll for net_info
@@ -293,6 +311,9 @@ func main() {
 		pm = state.PeerMap
 		discovered = state.Discovered
 		successful = state.Successful
+		if successful < current - track - lagBlocks - 1 {
+			successful = current - track - lagBlocks - 1
+		}
 		missed.MMCache = state.GeoCache
 		if !missed.MMCache.SetAuth(user, apiKey) {
 			l.Fatal("could not set maxmind credentials")
@@ -325,6 +346,9 @@ func main() {
 		}
 		if pm == nil {
 			pm = make([]missed.PeerSet, 0)
+		}
+		if skipDisco {
+			return
 		}
 
 		var busy bool
@@ -453,6 +477,7 @@ func main() {
 
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
+		// sockets
 		case "/missed/ws":
 			broadcaster(writer, request, &bcastMissed)
 		case "/top/ws":
@@ -463,6 +488,13 @@ func main() {
 			broadcaster(writer, request, &bcastMap)
 		case "/net/ws":
 			broadcaster(writer, request, &bcastNetstats)
+		case "/mem/ws":
+			broadcaster(writer, request, &bcastMpool)
+
+		// cached rest
+		case "/mem":
+			setJsonHeader(writer)
+			_, _ = writer.Write(missed.UnconfirmedCache)
 		case "/net":
 			setJsonHeader(writer)
 			_, _ = writer.Write(cachedNetStats)
@@ -481,6 +513,7 @@ func main() {
 		case "/map":
 			setJsonHeader(writer)
 			_, _ = writer.Write(cachedMap)
+
 		case "/block":
 			params := request.URL.Query()
 			if params["num"] == nil || len(params["num"]) != 1 {
@@ -508,6 +541,8 @@ func main() {
 			}
 			setJsonHeader(writer)
 			_, _ = writer.Write(j)
+
+		// static
 		case "/network.html":
 			writer.Header().Set("Server", "cosmissed")
 			writer.Header().Set("Content-Type", "text/html; charset=utf-8")

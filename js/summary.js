@@ -21,7 +21,7 @@ async function chainInfo() {
             tableSocket.addEventListener('message', function (event) {
                 let upd = JSON.parse(event.data);
                 document.getElementById('headblock').innerHTML = upd.block_num;
-                document.getElementById('missingNow').innerHTML = upd.vote_missing
+                document.getElementById('missingNow').innerHTML = upd.missed
                 document.getElementById('seconds').innerHTML = upd.delta_sec;
                 document.getElementById('proposedBy').innerHTML = upd.proposer
             });

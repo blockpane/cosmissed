@@ -237,7 +237,6 @@ type NodeLocation struct {
 }
 
 var nodeLocCache = make(map[string]*NodeLocation)
-
 var ispList = make(map[string]map[string]map[string]int)
 
 func NetworkSummary(d *Discovered, p PeerMap) NetworkStats {
