@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Validators</title>
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/jquery.dataTables.min.css">
+  <link rel="icon" href="img/favicon.png">
+</head>
+<body onload="getValidators()">
+<div class="container-xl border-bottom border-info" style="padding-top: 20px;">
+  <div class="row" style="padding-bottom: 10px;">
+    <div class="col-4 border-info">
+      <h3><span id="networkId" class="text-capitalize"></span> Monitor</h3>
+    </div>
+    <div class="col-4 d-flex justify-content-center btn-group btn-group-sm">
+      <a href="/"><button class="btn btn-secondary btn-sm">Overview</button></a>&nbsp;
+      <a href="/missed.html"><button class="btn btn-secondary btn-sm">Missed Blocks</button></a>&nbsp;
+      <a href="/network.html"><button class="btn btn-secondary btn-sm">Network</button></a>&nbsp;
+      <a href="/validators.html"><button class="btn btn-info btn-sm">Validators</button></a>
+    </div>
+  </div>
+</div>
+<div class="container-xl" style="padding-top: 20px;">
+  <div class="row mb-3">
+    <div class="col-4">&nbsp;</div>
+    <div class="col-1 d-flex justify-content-end">
+      <button class="btn-light btn-light rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#filter" aria-expanded="false" aria-controls="filter">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" class="bi bi-filter-circle" viewBox="0 0 16 16">
+          <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+          <path d="M7 11.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5z"/>
+        </svg>
+      </button>
+    </div>
+    <div class="col">
+      <h4>Validator Information</h4>
+    </div>
+  </div>
+    <div class="collapse" id="filter">
+    <div class="row g-3 bg-opacity-25 bg-secondary border border-3 border-secondary mt-2 rounded-3">
+      <div class="col-4 border-end border-1 border-secondary mb-3">
+        <span class="d-flex justify-content-center text-center fw-bolder">Staked</span>
+          <div class="input-group-sm row">
+            <div class="col">
+              <input type="text" id="stakemin" class="form-control text-dark" onkeyup="getValidators()" placeholder=0 aria-label="min stake">
+              <span class="input-group-text text-sm-center">min</span>
+            </div>
+            <div class="col">
+              <input type="text" id="stakemax" class="form-control text-dark" onkeyup="getValidators()" placeholder=0 aria-label="max stake">
+              <span class="input-group-text text-sm-center">max</span>
+          </div>
+        </div>
+        <br/>
+      </div>
+      <div class="col-4 border-end border-1 border-secondary mb-3">
+        <span class="d-flex justify-content-center text-center fw-bolder">Self Staked</span>
+        <div class="input-group-sm row">
+            <div class="col">
+              <input type="text" id="selfmin" class="form-control text-dark" placeholder=0 onkeyup="getValidators()" aria-label="min self-stake">
+              <span class="input-group-text text-sm-center">min</span>
+            </div>
+            <div class="col">
+              <input type="text" id="selfmax" class="form-control text-dark" placeholder=0 onkeyup="getValidators()" aria-label="max self-stake">
+              <span class="input-group-text text-sm-center">max</span>
+            </div>
+          </div>
+        <br/>
+      </div>
+      <div class="col-2 border-end border-1 border-secondary mb-3">
+        <span class="d-flex justify-content-center text-center fw-bolder">% Missed</span>
+        <div class="input-group-sm row">
+          <div class="col">
+          <input type="text" id="missmax" class="form-control text-dark" onkeyup="getValidators()" placeholder=0 aria-label="max missed">
+          <span class="input-group-text text-sm-center">max</span>
+          </div>
+        </div>
+        <br/>
+      </div>
+      <div class="col-2 mb-3">
+        <span class="d-flex justify-content-center text-center fw-bolder">Governance</span>
+        <br/>
+        <div class="input-group-sm row">
+          <div class="col-1">&nbsp;</div>
+          <div class="col">
+            <div class="form-check">
+              <input type="checkbox" id="voted" class="form-check-input" onchange="getValidators()" placeholder=0 aria-label="has voted">
+              <span class="form-check-label text-sm-center">Has voted for proposals</span>
+            </div>
+          </div>
+        </div>
+        <br/>
+      </div>
+  </div>
+</div>
+  <div class="row">
+    <div class="col-12 d-flex justify-content-center bg-gradient rounded-3">
+
+      <table class="table table-hover text-end table-light text-white table-borderless mt-3" id="sortTable">
+        <thead class="bg-transparent">
+        <tr class="text-center">
+          <th data-field="name" class="text-start" style="width: 25%;">Name</th>
+          <th data-field="stake">Stake</th>
+          <th data-field="self-stake">Self Stake</th>
+          <th data-field="missed">Missed Count</th>
+          <th data-field="missed-pct">% Missed</th>
+          <th data-field="unclaimed">Unclaimed Rewards</th>
+          <th data-field="unclaimed-com">Unclaimed Commission</th>
+          <th data-field="gov">Governance Participation</th>
+        </tr>
+        </thead>
+        <tbody id="validators">
+        <tr>
+          <td>⚠</td>
+          <td>⚠</td>
+          <td>⚠</td>
+          <td>⚠</td>
+          <td>⚠</td>
+          <td>⚠</td>
+          <td>⚠</td>
+          <td>⚠</td>
+        </tr>
+        </tbody>
+      </table>
+
+    </div>
+  </div>
+  <div class="row" style="padding-top: 30px;">
+    <p align="center">
+      <a href="https://blockpane.com"><img src="img/bp-logo-text.svg" height="30" alt="© 2021 Block Pane LLC."></a>&nbsp;
+      <a href="https://github.com/blockpane/cosmissed"><img src="img/GitHub-Mark.png" height="30"></a>
+    </p>
+  </div>
+</div>
+<script src="js/jquery-3.5.1.js"></script>
+<script src="js/jquery.dataTables.min.js"></script>
+<script src="js/val.js"></script>
+<script type="text/javascript">
+    let minStake, maxStake, minSelf, maxSelf, missed = 0
+    let gov, initialized = false
+    let table
+
+    function getValidators() {
+        if (initialized) {
+            table.destroy()
+        }
+        initialized = true
+
+        minStake = parseInt(document.getElementById("stakemin").value)
+        maxStake = parseInt(document.getElementById("stakemax").value)
+        minSelf = parseInt(document.getElementById("selfmin").value)
+        maxSelf = parseInt(document.getElementById("selfmax").value)
+        missed = parseInt(document.getElementById("missmax").value)
+        gov = document.getElementById("voted").checked
+
+        drawValidators(testData)
+        filterTable(minStake, maxStake, minSelf, maxSelf, missed, gov)
+
+        table = $('#sortTable').DataTable( {
+            "order": [[ 7, "desc" ]],
+            "paging": false,
+            "searching": false,
+        } );
+    }
+</script>
+
+<script src="js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

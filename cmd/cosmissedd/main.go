@@ -553,6 +553,11 @@ func main() {
 			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 			// todo appropriate security headers.
 			_, _ = writer.Write(missed.MissedHtml)
+		case "/validators.html":
+			writer.Header().Set("Server", "cosmissed")
+			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+			// todo appropriate security headers.
+			_, _ = writer.Write(missed.ValidatorsHtml)
 		case "/", "/index.html":
 			writer.Header().Set("Server", "cosmissed")
 			writer.Header().Set("Content-Type", "text/html; charset=utf-8")

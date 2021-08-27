@@ -18,6 +18,9 @@ var NetHtml []byte
 //go:embed missed.html
 var MissedHtml []byte
 
+//go:embed validators.html
+var ValidatorsHtml []byte
+
 //go:embed js/* img/* css/*
 var StaticContent embed.FS
 
