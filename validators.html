@@ -38,7 +38,7 @@
     </div>
   </div>
     <div class="collapse" id="filter">
-    <div class="row g-3 bg-opacity-25 bg-secondary border border-3 border-secondary mt-2 rounded-3">
+    <div class="row g-3 border border-3 border-secondary mt-2 rounded-3" style="background: rgba(107,59,177,0.1)">
       <div class="col-4 border-end border-1 border-secondary mb-3">
         <span class="d-flex justify-content-center text-center fw-bolder">Staked</span>
           <div class="input-group-sm row">
@@ -47,7 +47,7 @@
               <span class="input-group-text text-sm-center">min</span>
             </div>
             <div class="col">
-              <input type="text" id="stakemax" class="form-control text-dark" onkeyup="getValidators()" placeholder=0 aria-label="max stake">
+              <input type="text" id="stakemax" class="form-control text-dark" onkeyup="getValidators()" placeholder="infinity" aria-label="max stake">
               <span class="input-group-text text-sm-center">max</span>
           </div>
         </div>
@@ -61,7 +61,7 @@
               <span class="input-group-text text-sm-center">min</span>
             </div>
             <div class="col">
-              <input type="text" id="selfmax" class="form-control text-dark" placeholder=0 onkeyup="getValidators()" aria-label="max self-stake">
+              <input type="text" id="selfmax" class="form-control text-dark" placeholder="infinity" onkeyup="getValidators()" aria-label="max self-stake">
               <span class="input-group-text text-sm-center">max</span>
             </div>
           </div>
@@ -71,7 +71,7 @@
         <span class="d-flex justify-content-center text-center fw-bolder">% Missed</span>
         <div class="input-group-sm row">
           <div class="col">
-          <input type="text" id="missmax" class="form-control text-dark" onkeyup="getValidators()" placeholder=0 aria-label="max missed">
+          <input type="text" id="missmax" class="form-control text-dark" onkeyup="getValidators()" placeholder="infinity" aria-label="max missed">
           <span class="input-group-text text-sm-center">max</span>
           </div>
         </div>
@@ -95,8 +95,7 @@
 </div>
   <div class="row">
     <div class="col-12 d-flex justify-content-center bg-gradient rounded-3">
-
-      <table class="table table-hover text-end table-light text-white table-borderless mt-3" id="sortTable">
+      <table class="table table-hover text-end table-light text-white table-borderless mt-3 rounded-3 shadow-lg" id="sortTable">
         <thead class="bg-transparent">
         <tr class="text-center">
           <th data-field="name" class="text-start" style="width: 25%;">Name</th>
@@ -107,10 +106,12 @@
           <th data-field="unclaimed">Unclaimed Rewards</th>
           <th data-field="unclaimed-com">Unclaimed Commission</th>
           <th data-field="gov">Governance Participation</th>
+          <th data-field="com">Commision</th>
         </tr>
         </thead>
         <tbody id="validators">
         <tr>
+          <td>⚠</td>
           <td>⚠</td>
           <td>⚠</td>
           <td>⚠</td>
@@ -146,11 +147,11 @@
         }
         initialized = true
 
-        minStake = parseInt(document.getElementById("stakemin").value)
-        maxStake = parseInt(document.getElementById("stakemax").value)
-        minSelf = parseInt(document.getElementById("selfmin").value)
-        maxSelf = parseInt(document.getElementById("selfmax").value)
-        missed = parseInt(document.getElementById("missmax").value)
+        minStake = parseInt(document.getElementById("stakemin").value.replaceAll(',', ''))
+        maxStake = parseInt(document.getElementById("stakemax").value.replaceAll(',', ''))
+        minSelf = parseInt(document.getElementById("selfmin").value.replaceAll(',', ''))
+        maxSelf = parseInt(document.getElementById("selfmax").value.replaceAll(',', ''))
+        missed = parseInt(document.getElementById("missmax").value.replaceAll(',', ''))
         gov = document.getElementById("voted").checked
 
         drawValidators(testData)
