@@ -39,59 +39,64 @@ func WatchUnconfirmed(ctx context.Context, updates chan []byte, client *http.Cli
 	points := make(chan *txCountPoint)
 	go streamMemPool(ctx, client, baseUrl, points, failed)
 
-	subClient, _ := rpchttp.New(origApi, "/websocket")
-	err := subClient.Start()
-	if err != nil {
-		l.Fatal(origApi, err)
-	}
-	defer subClient.Stop()
-	query := "tm.event = 'NewBlock'"
-	freshBlocks, err := subClient.Subscribe(ctx, "test-client", query)
-	if err != nil {
-		l.Fatal(origApi, err)
-	}
-
 	for {
-		select {
-		case <-ctx.Done():
-			l.Println("WatchUnconfirmed() exiting: parent exited")
-			return
-		case <-failed:
-			l.Println("WatchUnconfirmed() exiting: streamMemPool failed")
-			return
-		case b := <-freshBlocks:
-			updates <-[]byte(fmt.Sprintf(`["%s",%d,"Confirmed Tx"]`,
-				b.Data.(types.EventDataNewBlock).Block.Time.Format(time.RFC3339),
-				len(b.Data.(types.EventDataNewBlock).Block.Txs),
-			))
-			confirmed[len(confirmed)-1] = &txCountPoint{
-				Time:    b.Data.(types.EventDataNewBlock).Block.Time,
-				Pending: len(b.Data.(types.EventDataNewBlock).Block.Txs),
-			}
-		case p := <-points:
-			updates <-[]byte(fmt.Sprintf(`["%s",%d,"Pending Tx"]`, p.Time.Format(time.RFC3339), p.Pending))
-			confirmed = append(confirmed[1:], &txCountPoint{
-				Time:    p.Time,
-				Pending: 0,
-			})
-			unconfirmed = append(unconfirmed[1:], p)
-			if time.Now().Second()%5 == 0 {
-				buf := bytes.NewBufferString(`[[`)
-				prefix := ""
-				for i := range unconfirmed {
-					buf.WriteString(fmt.Sprintf(`%s["%s",%d,"Pending Tx"]`, prefix, unconfirmed[i].Time.UTC().Format(time.RFC3339), unconfirmed[i].Pending))
-					prefix = ","
-				}
-				buf.WriteString(`],[`)
-				prefix = ""
-				for i := range confirmed {
-					buf.WriteString(fmt.Sprintf(`%s["%s",%d,"Confirmed Tx"]`, prefix, confirmed[i].Time.UTC().Format(time.RFC3339), confirmed[i].Pending))
-					prefix = ","
-				}
-				buf.WriteString(`]]`)
-				UnconfirmedCache = buf.Bytes()
-			}
+		subClient, _ := rpchttp.New(origApi, "/websocket")
+		err := subClient.Start()
+		if err != nil {
+			l.Fatal(origApi, err)
 		}
+		query := "tm.event = 'NewBlock'"
+		freshBlocks, err := subClient.Subscribe(ctx, "test-client", query)
+		if err != nil {
+			l.Fatal(origApi, err)
+		}
+
+		func() {
+			defer subClient.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					l.Println("WatchUnconfirmed() exiting: parent exited")
+					return
+				case <-failed:
+					l.Println("WatchUnconfirmed() exiting: streamMemPool failed")
+					return
+				case b := <-freshBlocks:
+					updates <- []byte(fmt.Sprintf(`["%s",%d,"Confirmed Tx"]`,
+						b.Data.(types.EventDataNewBlock).Block.Time.Format(time.RFC3339),
+						len(b.Data.(types.EventDataNewBlock).Block.Txs),
+					))
+					confirmed[len(confirmed)-1] = &txCountPoint{
+						Time:    b.Data.(types.EventDataNewBlock).Block.Time,
+						Pending: len(b.Data.(types.EventDataNewBlock).Block.Txs),
+					}
+				case p := <-points:
+					updates <- []byte(fmt.Sprintf(`["%s",%d,"Pending Tx"]`, p.Time.Format(time.RFC3339), p.Pending))
+					confirmed = append(confirmed[1:], &txCountPoint{
+						Time:    p.Time,
+						Pending: 0,
+					})
+					unconfirmed = append(unconfirmed[1:], p)
+					if time.Now().Second()%5 == 0 {
+						buf := bytes.NewBufferString(`[[`)
+						prefix := ""
+						for i := range unconfirmed {
+							buf.WriteString(fmt.Sprintf(`%s["%s",%d,"Pending Tx"]`, prefix, unconfirmed[i].Time.UTC().Format(time.RFC3339), unconfirmed[i].Pending))
+							prefix = ","
+						}
+						buf.WriteString(`],[`)
+						prefix = ""
+						for i := range confirmed {
+							buf.WriteString(fmt.Sprintf(`%s["%s",%d,"Confirmed Tx"]`, prefix, confirmed[i].Time.UTC().Format(time.RFC3339), confirmed[i].Pending))
+							prefix = ","
+						}
+						buf.WriteString(`]]`)
+						UnconfirmedCache = buf.Bytes()
+					}
+				}
+			}
+		}()
+		time.Sleep(10*time.Second)
 	}
 }
 

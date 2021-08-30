@@ -23,7 +23,7 @@ import (
 
 const (
 	lagBlocks      = 2
-	pollDiscovered = 5
+	pollDiscovered = 10
 )
 
 type savedState struct {
@@ -119,10 +119,6 @@ func main() {
 
 	go func() {
 		sig := <-sigs
-		//if missed.GeoDb != nil {
-		//	// prevent race using channel to close
-		//	close(closeDb)
-		//}
 		gCancel()
 		if socket != "" {
 			os.Remove(socket)
@@ -169,9 +165,6 @@ func main() {
 		go missed.WatchUnconfirmed(gCtx,memTx, missed.TClient, missed.TUrl, tendermintApi)
 		for mtx := range memTx {
 			_ = bcastMpool.Send(mtx)
-			//if e := bcastMpool.Send(mtx); e != nil {
-			//	l.Println("bcastMpool:", e)
-			//}
 		}
 	}()
 
@@ -241,6 +234,7 @@ func main() {
 		}
 	}
 
+	updatedTime := time.Now()
 	newBlock := func() (new bool) {
 		var h int
 		var e error
@@ -252,6 +246,7 @@ func main() {
 		if h-lagBlocks <= current {
 			return false
 		}
+		updatedTime = time.Now()
 		current = h - lagBlocks
 		return true
 	}
@@ -513,6 +508,14 @@ func main() {
 		case "/map":
 			setJsonHeader(writer)
 			_, _ = writer.Write(cachedMap)
+
+		// allow detecting upstream server not healthy
+		case "/health":
+			if updatedTime.Add(5*time.Minute).Before(time.Now()) {
+				writer.WriteHeader(http.StatusRequestTimeout)
+			} else {
+				writer.WriteHeader(http.StatusOK)
+			}
 
 		case "/block":
 			params := request.URL.Query()
