@@ -8,10 +8,16 @@ const warningTriangle = `<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
   <path d="M7.002 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 5.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995z"/>
 </svg>`
 
+const slashCircle = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="red" class="bi bi-slash-circle" viewBox="0 0 16 16">
+  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+  <path d="M11.354 4.646a.5.5 0 0 0-.708 0l-6 6a.5.5 0 0 0 .708.708l6-6a.5.5 0 0 0 0-.708z"/>
+</svg>`
+
 function drawValidators(vals) {
     document.getElementById("validators").innerHTML = null
     vals.forEach ((v) => {
         let redFlag = false
+        let avoid = false
         let row = document.createElement("tr")
         let name = row.insertCell(-1)
         let stake = row.insertCell(-1)
@@ -29,7 +35,7 @@ function drawValidators(vals) {
         let missedCount = row.insertCell(-1)
         missedCount.innerHTML = v["missed"].toLocaleString()
         let missed = row.insertCell(-1)
-        missed.innerHTML = v["missed_pct"].toLocaleString()+" %"
+        missed.innerHTML = v["missed_pct"].toLocaleString()
         if (parseInt(v["missed_pct"]) < 1) {
             missed.className = "text-success"
             missedCount.className = "text-success"
@@ -49,20 +55,22 @@ function drawValidators(vals) {
             vote.className = "text-warning"
         }
         let com = row.insertCell(-1)
-        com.innerHTML = v["commission"].toLocaleString()+" %"
+        com.innerHTML = v["commission"].toLocaleString()
         if (parseInt(v["commission"]) <= 1) {
             com.className = "text-warning"
         } else if (parseInt(v["commission"]) === 100) {
-            com.className = "text-danger fw-bolder fst-italic"
-            com.innerHTML = "⚠ " + com.innerHTML
+            com.className = "text-danger fw-bold text-decoration-underline"
+            avoid = true
             redFlag = true
         } else if (parseInt(v["commission"]) > 10) {
-            com.className = "text-danger"
+            com.className = "text-danger fw-bold"
             redFlag = true
         } else if (parseInt(v["commission"]) <= 5) {
             com.className = "text-success"
         }
-        if (redFlag === true) {
+        if (avoid === true){
+            name.innerHTML = `<button class="btn-light">${slashCircle}</button> &nbsp;` + v["name"]
+        } else if (redFlag === true) {
             name.innerHTML = `<button class="btn-light">${warningTriangle}</button> &nbsp;` + v["name"]
         } else {
             name.innerHTML = `<button class="btn-light">${infoCircle}</button> &nbsp;` + v["name"]
@@ -87,7 +95,7 @@ function filterTable(minStake = 0, maxStake = 0, minSelf = 0, maxSelf = 0, misse
             --i
             continue
         }
-        const pct = parseInt(tbl.rows[i].cells[4].innerHTML.replaceAll(',', ''))
+        const pct = parseInt(tbl.rows[i].cells[4].innerHTML)
         if (missed !== 0 && pct >= missed) {
             tbl.deleteRow(i)
             --i

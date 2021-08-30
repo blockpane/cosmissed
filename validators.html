@@ -27,19 +27,19 @@
     <div class="col-4">&nbsp;</div>
     <div class="col-1 d-flex justify-content-end">
       <button class="btn-light btn-light rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#filter" aria-expanded="false" aria-controls="filter">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" class="bi bi-filter-circle" viewBox="0 0 16 16">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" class="bi bi-filter-circle" viewBox="0 0 16 16">
           <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
           <path d="M7 11.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5z"/>
         </svg>
       </button>
     </div>
-    <div class="col">
-      <h4>Validator Information</h4>
+    <div class="col mt-1">
+      <h5>Validator Information</h5>
     </div>
   </div>
     <div class="collapse" id="filter">
-    <div class="row g-3 border border-3 border-secondary mt-2 rounded-3" style="background: rgba(107,59,177,0.1)">
-      <div class="col-4 border-end border-1 border-secondary mb-3">
+    <div class="row g-3 m-4 p-0 rounded-3 justify-content-center" style="background: rgba(80,3,120,0.2)">
+      <div class="col-3 border-end border-1 border-secondary mb-3">
         <span class="d-flex justify-content-center text-center fw-bolder">Staked</span>
           <div class="input-group-sm row">
             <div class="col">
@@ -53,7 +53,7 @@
         </div>
         <br/>
       </div>
-      <div class="col-4 border-end border-1 border-secondary mb-3">
+      <div class="col-3 border-end border-1 border-secondary mb-3">
         <span class="d-flex justify-content-center text-center fw-bolder">Self Staked</span>
         <div class="input-group-sm row">
             <div class="col">
@@ -77,7 +77,7 @@
         </div>
         <br/>
       </div>
-      <div class="col-2 mb-3">
+      <div class="col-3 mb-3">
         <span class="d-flex justify-content-center text-center fw-bolder">Governance</span>
         <br/>
         <div class="input-group-sm row">
@@ -93,9 +93,9 @@
       </div>
   </div>
 </div>
-  <div class="row">
-    <div class="col-12 d-flex justify-content-center bg-gradient rounded-3">
-      <table class="table table-hover text-end table-light text-white table-borderless mt-3 rounded-3 shadow-lg" id="sortTable">
+  <div class="row p-0 m-0">
+    <div class="col-12 d-flex rounded-3 p-0 justify-content-center">
+      <table class="table table-hover text-end table-light text-white fw-lighter small table-borderless mt-3 rounded-3 shadow-lg border border-secondary border-1" id="sortTable">
         <thead class="bg-transparent">
         <tr class="text-center">
           <th data-field="name" class="text-start" style="width: 25%;">Name</th>
@@ -106,7 +106,7 @@
           <th data-field="unclaimed">Unclaimed Rewards</th>
           <th data-field="unclaimed-com">Unclaimed Commission</th>
           <th data-field="gov">Governance Participation</th>
-          <th data-field="com">Commision</th>
+          <th data-field="com">% Commision</th>
         </tr>
         </thead>
         <tbody id="validators">
