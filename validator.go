@@ -154,7 +154,13 @@ func ParseValidatorsResp(body []byte, history bool) ([]Validator, error) {
 			case "status":
 				validator.Status = toStr(v)
 			case "tokens":
-				validator.Tokens = toNum(toStr(v), "uint64").(uint64)
+				s := toStr(v)
+				if len(s) <= Precision {
+					s = "0"
+				} else {
+					s = s[:len(s)-Precision]
+				}
+				validator.Tokens = toNum(s, "uint64").(uint64)
 			case "delegator_shares":
 				validator.DelegatorShares = toNum(toStr(v), "float64").(float64)
 			case "description":
