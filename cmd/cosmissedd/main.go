@@ -465,9 +465,10 @@ func main() {
 		}
 	}
 
+
 	// Something very strange going on with http.FS ... if using switch below does not send mime types?
 	http.Handle("/js/", http.FileServer(http.FS(missed.StaticContent)))
-	http.Handle("/img/", http.FileServer(http.FS(missed.StaticContent)))
+	http.Handle("/img/", &CacheHandler{})
 	http.Handle("/css/", http.FileServer(http.FS(missed.StaticContent)))
 
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
@@ -574,4 +575,12 @@ func main() {
 	}
 
 	l.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", listen), nil))
+}
+
+// CacheHandler implements the Handler interface with a very long Cache-Control set on responses
+type CacheHandler struct{}
+
+func (ch CacheHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "public, max-age=86400")
+	http.FileServer(http.FS(missed.StaticContent)).ServeHTTP(writer, request)
 }
