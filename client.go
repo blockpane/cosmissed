@@ -128,6 +128,7 @@ func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 }
 
 func FetchPeers(xtra []string) (peers PeerMap) {
+	peers = make([]PeerSet, 0)
 	if xtra == nil {
 		_, pm, err := GetNeighbors("")
 		if err != nil {
