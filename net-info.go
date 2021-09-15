@@ -73,6 +73,7 @@ func (nif netInfoResp) getListenerIp(node string) (string, error) {
 }
 
 var privateBlocks = [...]*net.IPNet{
+	parseCIDR("0.0.0.0/32"),     // RFC 1918 IPv4 private network address
 	parseCIDR("10.0.0.0/8"),     // RFC 1918 IPv4 private network address
 	parseCIDR("100.64.0.0/10"),  // RFC 6598 IPv4 shared address space
 	parseCIDR("127.0.0.0/8"),    // RFC 1122 IPv4 loopback address
