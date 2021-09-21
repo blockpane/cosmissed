@@ -34,7 +34,8 @@ var unconfirmed = mkTxPoint(1)
 var confirmed = mkTxPoint(1)
 
 
-func WatchUnconfirmed(ctx context.Context, updates chan []byte, client *http.Client, baseUrl, origApi string) {
+func WatchUnconfirmed(ctx context.Context, updates chan []byte, client *http.Client, baseUrl, origApi string, started chan interface{}) {
+	<- started
 	failed := make(chan interface{})
 	points := make(chan *txCountPoint)
 	go streamMemPool(ctx, client, baseUrl, points, failed)

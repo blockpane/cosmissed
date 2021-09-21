@@ -46,6 +46,7 @@ func main() {
 		current, successful, track, listen, precision                                             int
 		cosmosApi, tendermintApi, prefix, networkName, socket, cacheFile, xRpcHosts, user, apiKey string
 		ready, stdout, skipDisco                                                                  bool
+		readyChan                                                                                 = make(chan interface{})
 	)
 
 	flag.StringVar(&cosmosApi, "c", "http://127.0.0.1:1317", "cosmos http API endpoint")
@@ -164,7 +165,7 @@ func main() {
 	// membpool stats:
 	go func() {
 		memTx := make(chan []byte)
-		go missed.WatchUnconfirmed(gCtx,memTx, missed.TClient, missed.TUrl, tendermintApi)
+		go missed.WatchUnconfirmed(gCtx, memTx, missed.TClient, missed.TUrl, tendermintApi, readyChan)
 		for mtx := range memTx {
 			_ = bcastMpool.Send(mtx)
 		}
@@ -278,60 +279,67 @@ func main() {
 		}
 	}
 
-	if !newBlock() {
-		fmt.Println("\nOptions:")
-		flag.PrintDefaults()
-		l.Fatalln("cannot get current block, giving up")
-	}
-	if !func() bool {
-		f, e := os.Open(cacheFile)
-		if e != nil {
-			l.Println("could not load existing cache file, starting with clean state:", e.Error())
-			return false
+	go func() {
+		for !newBlock() {
+			l.Println("cannot get current block, waiting to start")
+			time.Sleep(5 * time.Second)
 		}
-		defer f.Close()
-		enc := gob.NewDecoder(f)
-		state := &savedState{}
-		e = enc.Decode(state)
-		if e != nil {
-			l.Println("could not decode cache file, removing old file and starting with clean state:", e.Error())
-			defer os.Remove(cacheFile)
-			return false
-		}
-		if state.BlockError == nil || state.Results == nil || state.CachedTop == nil || state.CachedParams == nil || state.CachedChart == nil || state.CachedResult == nil {
-			l.Println("cache file had invalid data, starting with clean state")
-			defer os.Remove(cacheFile)
-			return false
-		}
-		cachedResult = state.CachedResult
-		cachedTop = state.CachedTop
-		cachedChart = state.CachedChart
-		cachedParams = state.CachedParams
-		blockError = state.BlockError
-		results = state.Results
-		pm = state.PeerMap
-		discovered = state.Discovered
-		successful = state.Successful
-		if successful < current - track - lagBlocks - 1 {
+		if !func() bool {
+			f, e := os.Open(cacheFile)
+			if e != nil {
+				l.Println("could not load existing cache file, starting with clean state:", e.Error())
+				return false
+			}
+			defer f.Close()
+			enc := gob.NewDecoder(f)
+			state := &savedState{}
+			e = enc.Decode(state)
+			if e != nil {
+				l.Println("could not decode cache file, removing old file and starting with clean state:", e.Error())
+				defer os.Remove(cacheFile)
+				return false
+			}
+			if state.BlockError == nil || state.Results == nil || state.CachedTop == nil || state.CachedParams == nil || state.CachedChart == nil || state.CachedResult == nil {
+				l.Println("cache file had invalid data, starting with clean state")
+				defer os.Remove(cacheFile)
+				return false
+			}
+			cachedResult = state.CachedResult
+			cachedTop = state.CachedTop
+			cachedChart = state.CachedChart
+			cachedParams = state.CachedParams
+			blockError = state.BlockError
+			results = state.Results
+			pm = state.PeerMap
+			discovered = state.Discovered
+			successful = state.Successful
+			if successful < current-track-lagBlocks-1 {
+				successful = current - track - lagBlocks - 1
+			}
+			missed.MMCache = state.GeoCache
+			if !missed.MMCache.SetAuth(user, apiKey) {
+				l.Fatal("could not set maxmind credentials")
+			}
+			return true
+		}() {
+			if !missed.MMCache.SetAuth(user, apiKey) {
+				l.Fatal("could not set maxmind credentials")
+			}
+			results = make([]*missed.Summary, track)
 			successful = current - track - lagBlocks - 1
+			l.Printf("fetching last %d blocks, please wait\n", track)
+			refresh()
+			top()
 		}
-		missed.MMCache = state.GeoCache
-		if !missed.MMCache.SetAuth(user, apiKey) {
-			l.Fatal("could not set maxmind credentials")
-		}
-		return true
-	}() {
-		if !missed.MMCache.SetAuth(user, apiKey) {
-			l.Fatal("could not set maxmind credentials")
-		}
-		results = make([]*missed.Summary, track)
-		successful = current - track - lagBlocks - 1
-		l.Printf("fetching last %d blocks, please wait\n", track)
-		refresh()
-		top()
-	}
+		ready = true
+		close(readyChan)
+		logmod = 10
+	}()
 
 	go func() {
+		for !ready {
+			time.Sleep(time.Second)
+		}
 		j := make([]byte, 0)
 		netStats := missed.NetworkStats{
 			CityLabels:    make([]string, 0),
@@ -423,14 +431,12 @@ func main() {
 			select {
 			case <-tick.C:
 				findPeers()
-			//case <-closeDb:
-			//	_ = missed.GeoDb.Close()
+				//case <-closeDb:
+				//	_ = missed.GeoDb.Close()
 			}
 		}
 	}()
 
-	ready = true
-	logmod = 10
 	l.Println("cache populated, starting server.")
 	go func() {
 		tick := time.NewTicker(2 * time.Second)
@@ -464,13 +470,13 @@ func main() {
 		sub := b.Listen()
 		defer sub.Discard()
 		for message := range sub.Channel() {
-			if e := c.WriteMessage(websocket.TextMessage, message.([]byte)); e != nil {
-				l.Println(request.RemoteAddr, e)
-				return
-			}
+			_ = c.WriteMessage(websocket.TextMessage, message.([]byte))
+			//if e := c.WriteMessage(websocket.TextMessage, message.([]byte)); e != nil {
+			//	l.Println(request.RemoteAddr, e)
+			//	return
+			//}
 		}
 	}
-
 
 	// Something very strange going on with http.FS ... if using switch below does not send mime types?
 	http.Handle("/js/", http.FileServer(http.FS(missed.StaticContent)))
@@ -518,7 +524,7 @@ func main() {
 
 		// allow detecting upstream server not healthy
 		case "/health":
-			if updatedTime.Add(5*time.Minute).Before(time.Now()) {
+			if updatedTime.Add(5 * time.Minute).Before(time.Now()) {
 				writer.WriteHeader(http.StatusRequestTimeout)
 			} else {
 				writer.WriteHeader(http.StatusOK)

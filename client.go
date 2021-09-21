@@ -128,6 +128,7 @@ func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 }
 
 func FetchPeers(xtra []string) (peers PeerMap) {
+	peers = make([]PeerSet, 0)
 	if xtra == nil {
 		_, pm, err := GetNeighbors("")
 		if err != nil {
@@ -225,6 +226,7 @@ func GetNeighbors(node string) (source string, peers PeerSet, e error) {
 			pSplit := strings.Split(p.NodeInfo.Other.RpcAddress, `:`)
 			if port, err = strconv.Atoi(pSplit[len(pSplit)-1]); err != nil {
 				l.Printf(`could not parse port from %s: %s`, p.NodeInfo.Other.RpcAddress, err.Error())
+				continue
 			}
 		}
 		result.Peers = append(result.Peers, Peer{

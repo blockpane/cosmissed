@@ -39,7 +39,7 @@ async function query() {
                 {
                     show: true,
                     realtime: true,
-                    start: 97,
+                    start: 67,
                     end: 100,
                     zoomOnMouseWheel: false,
                     moveOnMouseWheel: false,
