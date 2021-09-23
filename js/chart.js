@@ -1,3 +1,5 @@
+let pasteBoard = []
+
 async function query() {
     try {
         const response = await fetch("/chart", {
@@ -194,6 +196,13 @@ async function query() {
             option.dataZoom[0].end = e.end;
         });
 
+        const copyButton = `
+              <btn onclick="copyMiss()" class="btn-outline-dark btn-sm">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard" viewBox="0 0 16 16">
+                    <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                    <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+                  </svg>
+              </btn>&nbsp;`
         const setMissing = function (title, data, jailed){
             let monikers = [];
             let titleId = "missingWhen";
@@ -215,6 +224,8 @@ async function query() {
             }
             if (monikers.length === 0 && (title === "Currently Missing:" || title === "Jailed (unbonding):")) {
                 title = ""
+            } else if (!jailed) {
+                title = copyButton + title
             }
             const missingWhen = document.getElementById(titleId);
             missingWhen.innerHTML = title+'<br/>&nbsp;<br/>&nbsp;'
@@ -227,10 +238,23 @@ async function query() {
                 if (nameA > nameB) {return 1;}
                 return 0;
             });
+            let seconds = ""
+            if (data.delta_sec !== undefined) {
+                seconds = data.delta_sec + "s"
+            }
+            if (!jailed) {
+                pasteBoard = [];
+                if (data.block_num > 0) {
+                    pasteBoard.push(`${data.block_num} (${data.proposer}) ${seconds}\n\nMissing:\n--------`);
+                }
+            }
             monikers.forEach((moniker) => {
                 let li = document.createElement("li")
                 li.appendChild(document.createTextNode(moniker));
                 missing.appendChild(li);
+                if (!jailed) {
+                    pasteBoard.push(moniker)
+                }
             });
         }
 
@@ -251,7 +275,7 @@ async function query() {
                 }).then(event => {
                     event.json().then(upd => {
                         if (upd.hasOwnProperty("missing")) {
-                            setMissing("🛑 Missed " + pausedAt + ": ", upd, false)
+                            setMissing("🛑 &nbsp;Missed " + pausedAt + ": ", upd, false)
                         }
                     });
                 })
@@ -260,7 +284,7 @@ async function query() {
         missingChart.on('globalout', function (){
             if (!updating) {
                 const missingWhen = document.getElementById('missingWhen');
-                missingWhen.innerHTML = "⏲ Missed " + pausedAt + ":<br/>&nbsp;<br/>&nbsp;";
+                missingWhen.innerHTML = copyButton + "⏲ &nbsp;Missed " + pausedAt + ":<br/>&nbsp;<br/>&nbsp;";
                 updating = true;
             }
         })
@@ -335,4 +359,8 @@ async function query() {
     } catch (e) {
         console.log(e.toString());
     }
+}
+
+async function copyMiss() {
+    await navigator.clipboard.writeText(`${pasteBoard.join("\n")}`)
 }
