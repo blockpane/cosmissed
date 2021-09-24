@@ -54,47 +54,70 @@ async function topMissed() {
         option = {
             backgroundColor: 'rgba(0, 0, 0, 0.0)',
             textStyle: {
-                color: 'rgba(255, 255, 255, 0.7)'
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontSize: 13,
             },
             tooltip: {
                 trigger: 'axis',
                 axisPointer: {
                     type: 'shadow'
-                }
+                },
+                backgroundColor: 'rgba(0,0,0,0.65)',
+                textStyle: {
+                    color: 'rgba(255,255,255,1.0)'
+                },
+                padding: [
+                    5,  // up
+                    10, // right
+                    5,  // down
+                    10, // left
+                ],
+                confine: true,
             },
-            legend: {
-                data: ['Missed %', "Vote Weight"]
-            },
+            //legend: {
+            //    data: ['Missed %', "Vote Weight"],
+            //},
             grid: {
-                left: '6%',
-                right: '4%',
-                bottom: '3%',
+                left: '10%',
+                right: '0%',
+                top: '0%',
+                bottom: '0%',
                 containLabel: true
             },
             xAxis: {
                 type: 'value',
-                inverse: true
+                inverse: true,
+                nameTextStyle: {fontSize: 15},
             },
             yAxis: {
                 type: 'category',
-                data: missing.monikers
+                data: missing.monikers,
+                nameTextStyle: {fontSize: 15},
+                axisLine: { show: false },
+                axisTick: { show: false },
+                splitLine: { show: false },
             },
             series: [
                 {
+                    barGap: 0,
+                    barCategoryGap: 0,
+                    barWidth: 32,
+                    barMaxWidth: 32,
                     name: '% Missed in '+params.depth+' blocks',
                     type: 'bar',
                     stack: 'total',
                     label: {
                         show: true,
-                        position: 'inside',
-                        padding: 2,
+                        position: 'insideRight',
+                        padding: 8,
+                        color: "#fff",
                     },
-                    emphasis: {
-                        focus: 'series'
-                    },
+                    //emphasis: {
+                    //    focus: 'series'
+                    //},
                     data: missing.missed,
                     itemStyle: {
-                        opacity: 0.8,
+                        opacity: 0.9,
                         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{
                             offset: 0,
                             color: 'rgb(0,0,0)'
@@ -108,18 +131,22 @@ async function topMissed() {
                     name: '% Impact vs. Consensus',
                     type: 'bar',
                     stack: 'total',
+                    barGap: 0,
+                    barCategoryGap: 0,
+                    barWidth: 32,
+                    barMaxWidth: 32,
                     label: {
                         show: true,
-                        //position: 'right'
-                        position: 'inside',
-                        padding: 2,
+                        position: 'insideLeft',
+                        padding: 8,
+                        color: "#fff",
                     },
-                    emphasis: {
-                        focus: 'series'
-                    },
+                    //emphasis: {
+                    //    focus: 'series'
+                    //},
                     data: missing.votes,
                     itemStyle: {
-                        opacity: 0.8,
+                        opacity: 0.9,
                         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{
                             offset: 0,
                             color: 'rgb(0,0,0)'
