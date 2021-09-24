@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var Precision int
 
 type Params struct {
 	Depth int    `json:"depth"`
@@ -139,9 +142,15 @@ func TopMissed(summaries []*Summary, blocks int, prefix string) ([]*Top, error) 
 			Missed:    v,
 			MissedPct: 100.0 * float32(v) / float32(blocks),
 		}
-		if tokens, e := strconv.ParseUint(weights.Validators[index[k]].Tokens, 10, 64); e == nil {
-			t.Votes = int64(tokens) / -1_000_000
+		if len(weights.Validators[index[k]].Tokens) > Precision{
+			tokens, e := strconv.ParseUint(weights.Validators[index[k]].Tokens[:len(weights.Validators[index[k]].Tokens)-Precision], 10, 64)
+			if e == nil {
+				t.Votes = int64(tokens) / -1_000_000
+			} else {
+				log.Println("error calculating votes", e)
+			}
 		}
+
 		t.Moniker = bm.Sanitize(weights.Validators[index[k]].Description.Moniker)
 		top = append(top, t)
 	}
@@ -152,7 +161,14 @@ func TopMissed(summaries []*Summary, blocks int, prefix string) ([]*Top, error) 
 		}
 	}
 	sort.Slice(top, func(i, j int) bool {
-		return top[i].Missed > top[j].Missed
+		switch false {
+		case top[i].Missed == top[j].Missed:
+			return top[i].Missed > top[j].Missed
+		case top[i].Votes == top[j].Votes:
+			return top[i].Votes > top[j].Votes
+		default:
+			return top[i].Moniker[0] > top[j].Moniker[0]
+		}
 	})
 	return top, nil
 }

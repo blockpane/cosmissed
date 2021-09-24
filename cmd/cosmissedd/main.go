@@ -43,7 +43,7 @@ func main() {
 	l := log.New(os.Stderr, "cosmissed | ", log.Lshortfile|log.LstdFlags)
 
 	var (
-		current, successful, track, listen                                                        int
+		current, successful, track, listen, precision                                             int
 		cosmosApi, tendermintApi, prefix, networkName, socket, cacheFile, xRpcHosts, user, apiKey string
 		ready, stdout, skipDisco                                                                  bool
 		readyChan                                                                                 = make(chan interface{})
@@ -59,6 +59,7 @@ func main() {
 	flag.StringVar(&apiKey, "key", "", "Required: Key for GeoIP2 Precision Web Service")
 	flag.IntVar(&listen, "l", 8080, "webserver port to listen on")
 	flag.IntVar(&track, "n", 3000, "most recent blocks to track")
+	flag.IntVar(&precision, "precision", 6, "decimal places for vote value, must be 8 or higher")
 	flag.BoolVar(&stdout, "v", false, "log new records to stdout (error logs already on stderr)")
 	flag.BoolVar(&skipDisco, "no-discovery", false, "do not perform node discovery")
 
@@ -67,6 +68,8 @@ func main() {
 	if !skipDisco && (user == "" || apiKey == "") {
 		l.Fatal("the '-user' and '-key' options are required")
 	}
+
+	missed.Precision = precision - 5
 
 	switch {
 	case strings.HasPrefix(cosmosApi, "unix://"):
@@ -222,8 +225,12 @@ func main() {
 				_ = l.Output(2, e.Error())
 			}
 
+			//vp := big.NewInt(int64(sum.VotePower))
+			//p := big.NewInt(10)
+			//p.Exp(p, big.NewInt(int64(missed.Precision-1)), nil)
 			cachedParams, e = json.Marshal(missed.Params{
 				Depth: track,
+				//Power: vp.Div(vp, p).Uint64(),
 				Power: sum.VotePower,
 				Chain: networkName,
 			})
