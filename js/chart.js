@@ -261,6 +261,7 @@ async function query() {
         let updating = true;
         let pausedAt = 0;
         let pauseOffset = 0;
+        let proposer = "";
         missingChart.on('click', function (e){
             if (e.hasOwnProperty('dataIndex') && e.dataIndex < data.blocks.length) {
                 updating = false;
@@ -275,7 +276,8 @@ async function query() {
                 }).then(event => {
                     event.json().then(upd => {
                         if (upd.hasOwnProperty("missing")) {
-                            setMissing("🛑 &nbsp;Missed " + pausedAt + ": ", upd, false)
+                            proposer = upd.proposer
+                            setMissing(`🛑 &nbsp;Missed ${pausedAt} (${proposer}): `, upd, false)
                         }
                     });
                 })
@@ -284,7 +286,7 @@ async function query() {
         missingChart.on('globalout', function (){
             if (!updating) {
                 const missingWhen = document.getElementById('missingWhen');
-                missingWhen.innerHTML = copyButton + "⏲ &nbsp;Missed " + pausedAt + ":<br/>&nbsp;<br/>&nbsp;";
+                missingWhen.innerHTML = `${copyButton} ⏲ &nbsp;Missed ${pausedAt} (${proposer}):<br/>&nbsp;<br/>&nbsp;`;
                 updating = true;
             }
         })
