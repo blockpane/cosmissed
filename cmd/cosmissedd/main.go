@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	lagBlocks      = 2
+	lagBlocks      = 0
 	pollDiscovered = 10
 )
 
@@ -437,9 +437,10 @@ func main() {
 		}
 	}()
 
-	l.Println("cache populated, starting server.")
 	go func() {
-		tick := time.NewTicker(2 * time.Second)
+		<-readyChan
+		l.Println("cache populated, starting server.")
+		tick := time.NewTicker(time.Second)
 		for {
 			select {
 			case <-tick.C:

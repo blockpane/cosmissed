@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	commitPath        = `/commit?height=`
+	blockPath         = `/block?height=`
 	validatorsetsPath = `/validatorsets/`
 	historicalPath    = `/cosmos/staking/v1beta1/historical_info/`
 	unbondingPath     = `/cosmos/staking/v1beta1/validators?status=BOND_STATUS_UNBONDING`
@@ -89,7 +89,7 @@ func fetch(height int, client *http.Client, baseUrl, path string) ([]byte, error
 
 func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 	m := minSignatures{}
-	b, err := fetch(height, TClient, TUrl, commitPath)
+	b, err := fetch(height, TClient, TUrl, blockPath)
 	if err != nil {
 		return nil, err
 	}
