@@ -209,6 +209,7 @@ func GetNeighbors(node string) (source string, peers PeerSet, e error) {
 		cacheMux.Lock()
 		// for now skip ipv6
 		if strings.Contains(p.RemoteIp, `[`) {
+			cacheMux.Unlock()
 			continue
 		}
 		ll := cachedPoints[p.RemoteIp]
