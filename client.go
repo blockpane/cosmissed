@@ -65,7 +65,7 @@ func CurrentHeight() (curHeight int, networkName string, err error) {
 	return
 }
 
-func fetch(height int, client *http.Client, baseUrl, path string) ([]byte, error) {
+func fetch(height int, client *http.Client, baseUrl, path string, page int) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	var req *http.Request
@@ -74,7 +74,11 @@ func fetch(height int, client *http.Client, baseUrl, path string) ([]byte, error
 	case 0:
 		req, err = http.NewRequestWithContext(ctx, "GET", baseUrl+path, nil)
 	default:
-		req, err = http.NewRequestWithContext(ctx, "GET", baseUrl+path+strconv.Itoa(height), nil)
+		if page > 0 {
+			req, err = http.NewRequestWithContext(ctx, "GET", baseUrl+path+strconv.Itoa(height)+`?page=`+strconv.Itoa(page), nil)
+		} else {
+			req, err = http.NewRequestWithContext(ctx, "GET", baseUrl+path+strconv.Itoa(height), nil)
+		}
 	}
 	if err != nil {
 		return nil, err
@@ -89,7 +93,7 @@ func fetch(height int, client *http.Client, baseUrl, path string) ([]byte, error
 
 func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 	m := minSignatures{}
-	b, err := fetch(height, TClient, TUrl, blockPath)
+	b, err := fetch(height, TClient, TUrl, blockPath, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +101,7 @@ func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 	proposer, ts, signers := m.parse()
 
 	v := minValidatorSet{}
-	b, err = fetch(height, CClient, CUrl, validatorsetsPath)
+	b, err = fetch(height, CClient, CUrl, validatorsetsPath, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +109,25 @@ func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 	if err != nil {
 		return nil, err
 	}
+	// can't get more than 100 from the validatorsets endpoint! This is a dirty hack.
+	num, _ := strconv.Atoi(v.Result.Total)
+	if num > 100 {
+		v2 := minValidatorSet{}
+		b, err = fetch(height, CClient, CUrl, validatorsetsPath, 2)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(b, &v2)
+		if err != nil {
+			return nil, err
+		}
+		for i := range v2.Result.Validators {
+			v.Result.Validators = append(v.Result.Validators, v2.Result.Validators[i])
+		}
+	}
 	addrs, cons := v.parse()
 
-	b, err = fetch(0, CClient, CUrl, unbondingPath)
+	b, err = fetch(0, CClient, CUrl, unbondingPath, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +136,7 @@ func FetchSummary(height int, catchingUp bool) (*Summary, error) {
 		return nil, err
 	}
 
-	b, err = fetch(height, CClient, CUrl, historicalPath)
+	b, err = fetch(height, CClient, CUrl, historicalPath, 0)
 	if err != nil {
 		return nil, err
 	}

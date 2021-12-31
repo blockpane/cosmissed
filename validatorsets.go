@@ -8,6 +8,7 @@ type minValidatorSet struct {
 				Value string `json:"value"`
 			} `json:"pub_key"`
 		} `json:"validators"`
+		Total string `json:"total"`
 	} `json:"result"`
 }
 
