@@ -70,7 +70,6 @@ func main() {
 	}
 
 	missed.Precision = precision - 5
-
 	switch {
 	case strings.HasPrefix(cosmosApi, "unix://"):
 		l.Println("Using socket:", strings.Replace(cosmosApi, `unix://`, "", 1))
@@ -183,24 +182,25 @@ func main() {
 		}
 	}
 
+	// disabled for now....
 	top := func() {
-		t, err := missed.TopMissed(results, track, prefix)
-		if err != nil {
-			l.Println(err)
-			return
-		}
-		j, err := json.MarshalIndent(t, "", "  ")
-		if err != nil {
-			l.Println(err)
-			return
-		}
-		if string(cachedTop) != string(j) {
-			cachedTop = j
-			err = bcastTop.Send(j)
-			if err != nil {
-				l.Println(err)
-			}
-		}
+		// t, err := missed.TopMissed(results, track, prefix)
+		// if err != nil {
+		// 	l.Println(err)
+		// 	return
+		// }
+		// j, err := json.MarshalIndent(t, "", "  ")
+		// if err != nil {
+		// 	l.Println(err)
+		// 	return
+		// }
+		// if string(cachedTop) != string(j) {
+		// 	cachedTop = j
+		// 	err = bcastTop.Send(j)
+		// 	if err != nil {
+		// 		l.Println(err)
+		// 	}
+		// }
 	}
 
 	push := func(sum *missed.Summary) {
@@ -513,9 +513,11 @@ func main() {
 		case "/missed":
 			setJsonHeader(writer)
 			_, _ = writer.Write(cachedResult)
+		// DISABLED
 		case "/top":
 			setJsonHeader(writer)
-			_, _ = writer.Write(cachedTop)
+			// _, _ = writer.Write(cachedTop)
+			_, _ = writer.Write([]byte("[]"))
 		case "/params":
 			setJsonHeader(writer)
 			_, _ = writer.Write(cachedParams)

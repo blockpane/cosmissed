@@ -92,59 +92,60 @@ func fetch(height int, client *http.Client, baseUrl, path string, page int) ([]b
 }
 
 func FetchSummary(height int, catchingUp bool) (*Summary, error) {
-	m := minSignatures{}
-	b, err := fetch(height, TClient, TUrl, blockPath, 0)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(b, &m)
-	proposer, ts, signers := m.parse()
+	return nil, fmt.Errorf("not implemented")
+	// m := minSignatures{}
+	// b, err := fetch(height, TClient, TUrl, blockPath, 0)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// err = json.Unmarshal(b, &m)
+	// proposer, ts, signers := m.parse()
 
-	v := minValidatorSet{}
-	b, err = fetch(height, CClient, CUrl, validatorsetsPath, 0)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(b, &v)
-	if err != nil {
-		return nil, err
-	}
-	// can't get more than 100 from the validatorsets endpoint! This is a dirty hack.
-	num, _ := strconv.Atoi(v.Result.Total)
-	if num > 100 {
-		v2 := minValidatorSet{}
-		b, err = fetch(height, CClient, CUrl, validatorsetsPath, 2)
-		if err != nil {
-			return nil, err
-		}
-		err = json.Unmarshal(b, &v2)
-		if err != nil {
-			return nil, err
-		}
-		for i := range v2.Result.Validators {
-			v.Result.Validators = append(v.Result.Validators, v2.Result.Validators[i])
-		}
-	}
-	addrs, cons := v.parse()
+	// v := minValidatorSet{}
+	// b, err = fetch(height, CClient, CUrl, validatorsetsPath, 0)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// err = json.Unmarshal(b, &v)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// // can't get more than 100 from the validatorsets endpoint! This is a dirty hack.
+	// num, _ := strconv.Atoi(v.Result.Total)
+	// if num > 100 {
+	// 	v2 := minValidatorSet{}
+	// 	b, err = fetch(height, CClient, CUrl, validatorsetsPath, 2)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	err = json.Unmarshal(b, &v2)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	for i := range v2.Result.Validators {
+	// 		v.Result.Validators = append(v.Result.Validators, v2.Result.Validators[i])
+	// 	}
+	// }
+	// addrs, cons := v.parse()
 
-	b, err = fetch(0, CClient, CUrl, unbondingPath, 0)
-	if err != nil {
-		return nil, err
-	}
-	jailed, err := ParseValidatorsResp(b, false)
-	if err != nil {
-		return nil, err
-	}
+	// b, err = fetch(0, CClient, CUrl, unbondingPath, 0)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// jailed, err := ParseValidatorsResp(b, false)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	b, err = fetch(height, CClient, CUrl, historicalPath, 0)
-	if err != nil {
-		return nil, err
-	}
-	vals, err := ParseValidatorsResp(b, true)
-	if err != nil {
-		return nil, err
-	}
-	return summarize(height, ts, proposer, signers, addrs, cons, vals, jailed, !catchingUp), nil
+	// b, err = fetch(height, CClient, CUrl, historicalPath, 0)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// vals, err := ParseValidatorsResp(b, true)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// return summarize(height, ts, proposer, signers, addrs, cons, vals, jailed, !catchingUp), nil
 }
 
 func FetchPeers(xtra []string) (peers PeerMap) {
@@ -184,7 +185,9 @@ func GetNeighbors(node string) (source string, peers PeerSet, e error) {
 		client = http.DefaultClient
 		url = node
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", url+`/net_info`, nil)
+
+	// check if node is on the same network
+	req, err := http.NewRequestWithContext(ctx, "GET", url+`/status`, nil)
 	if err != nil {
 		return "", empty, err
 	}
@@ -193,6 +196,29 @@ func GetNeighbors(node string) (source string, peers PeerSet, e error) {
 		return "", empty, err
 	}
 	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", empty, fmt.Errorf("GetNeighbors %s: %s", node, err.Error())
+	}
+	resp.Body.Close()
+	sr := &statusResp{}
+	err = json.Unmarshal(body, sr)
+	if err != nil {
+		return "", empty, err
+	}
+	if sr.Result.NodeInfo.Network != NetworkId {
+		return "", empty, errors.New("node is on a different network")
+	}
+
+	// get peer list
+	req, err = http.NewRequestWithContext(ctx, "GET", url+`/net_info`, nil)
+	if err != nil {
+		return "", empty, err
+	}
+	resp, err = client.Do(req)
+	if err != nil {
+		return "", empty, err
+	}
+	body, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return "", empty, fmt.Errorf("GetNeighbors %s: %s", node, err.Error())
 	}
